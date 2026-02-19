@@ -1,4 +1,4 @@
-//! erxi CLI — XML <-> EXI Konvertierung.
+//! erxi CLI — XML <-> EXI conversion.
 
 #[cfg(feature = "fast-alloc")]
 #[global_allocator]
@@ -33,7 +33,7 @@ fn encode_event_with_flush(
 }
 
 #[derive(Parser)]
-#[command(name = "erxi", about = "XML/JSON <-> EXI Konvertierung")]
+#[command(name = "erxi", about = "XML/JSON <-> EXI conversion")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -41,11 +41,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// XML nach EXI encodieren
+    /// Encode XML to EXI
     Encode(EncodeArgs),
-    /// EXI nach XML decodieren
+    /// Decode EXI to XML
     Decode(DecodeArgs),
-    /// JSON <-> EXI4JSON Konvertierung
+    /// JSON <-> EXI4JSON conversion
     Json {
         #[command(subcommand)]
         command: JsonCommand,
@@ -54,9 +54,9 @@ enum Command {
 
 #[derive(Subcommand)]
 enum JsonCommand {
-    /// JSON nach EXI4JSON encodieren
+    /// Encode JSON to EXI4JSON
     Encode(JsonEncodeArgs),
-    /// EXI4JSON nach JSON decodieren
+    /// Decode EXI4JSON to JSON
     Decode(JsonDecodeArgs),
 }
 
@@ -65,15 +65,15 @@ struct EncodeArgs {
     #[command(flatten)]
     common: CommonArgs,
 
-    /// Options im EXI-Header schreiben (Default: automatisch wenn nicht-default Optionen)
+    /// Always include options in EXI header (default: auto when non-default options)
     #[arg(long)]
     include_options: bool,
 
-    /// Options NICHT im EXI-Header schreiben (ueberschreibt --include-options und Auto-Detect)
+    /// Do NOT include options in EXI header (overrides --include-options and auto-detect)
     #[arg(long)]
     no_include_options: bool,
 
-    /// "$EXI" Cookie schreiben
+    /// Write "$EXI" cookie
     #[arg(long)]
     include_cookie: bool,
 }
@@ -83,144 +83,144 @@ struct DecodeArgs {
     #[command(flatten)]
     common: CommonArgs,
 
-    /// Pretty-printed XML-Ausgabe (2 Spaces Einzug)
+    /// Pretty-printed XML output (2-space indent)
     #[arg(long)]
     pretty: bool,
 }
 
 #[derive(Args)]
 struct JsonEncodeArgs {
-    /// Eingabedatei (- fuer stdin)
+    /// Input file (- for stdin)
     #[arg(short, long)]
     input: String,
 
-    /// Ausgabedatei (optional; ohne -o wird automatisch abgeleitet, -o - = stdout)
+    /// Output file (optional; without -o auto-derived, -o - = stdout)
     #[arg(short, long)]
     output: Option<String>,
 
-    /// EXI4JSON <other>-Typen heuristisch aktivieren (date/time/base64/integer/decimal)
+    /// Enable EXI4JSON <other> heuristics (date/time/base64/integer/decimal)
     #[arg(long)]
     exi4json_other: bool,
 }
 
 #[derive(Args)]
 struct JsonDecodeArgs {
-    /// Eingabedatei (- fuer stdin)
+    /// Input file (- for stdin)
     #[arg(short, long)]
     input: String,
 
-    /// Ausgabedatei (optional; ohne -o wird automatisch abgeleitet, -o - = stdout)
+    /// Output file (optional; without -o auto-derived, -o - = stdout)
     #[arg(short, long)]
     output: Option<String>,
 
-    /// Pretty-printed JSON-Ausgabe (2 Spaces Einzug)
+    /// Pretty-printed JSON output (2-space indent)
     #[arg(long)]
     pretty: bool,
 }
 
 #[derive(Args)]
 struct CommonArgs {
-    /// Eingabedatei (- fuer stdin)
+    /// Input file (- for stdin)
     #[arg(short, long)]
     input: String,
 
-    /// Ausgabedatei (optional; ohne -o wird automatisch abgeleitet, -o - = stdout)
+    /// Output file (optional; without -o auto-derived, -o - = stdout)
     #[arg(short, long)]
     output: Option<String>,
 
-    /// Schema-Datei (.xsd)
+    /// Schema file (.xsd)
     #[arg(short, long)]
     schema: Option<String>,
 
     // -- Alignment (gegenseitig ausschliessend) --
-    /// Byte-Alignment
+    /// Byte alignment
     #[arg(long, conflicts_with_all = ["pre_compression", "compression"])]
     byte_aligned: bool,
 
-    /// Pre-Compression Alignment
+    /// Pre-compression alignment
     #[arg(long, conflicts_with_all = ["byte_aligned", "compression"])]
     pre_compression: bool,
 
-    /// DEFLATE Compression
+    /// DEFLATE compression
     #[arg(long, conflicts_with_all = ["byte_aligned", "pre_compression"])]
     compression: bool,
 
     // -- Modus --
-    /// Strikter Modus
+    /// Strict mode
     #[arg(long)]
     strict: bool,
 
-    /// Fragment-Modus
+    /// Fragment mode
     #[arg(long)]
     fragment: bool,
 
     // -- Fidelity (preserve) --
-    /// CM-Events erhalten
+    /// Preserve comments (CM)
     #[arg(long)]
     preserve_comments: bool,
 
-    /// PI-Events erhalten
+    /// Preserve processing instructions (PI)
     #[arg(long)]
     preserve_pis: bool,
 
-    /// DT/ER-Events erhalten
+    /// Preserve DTDs and entity references (DT/ER)
     #[arg(long)]
     preserve_dtd: bool,
 
-    /// NS-Prefixes erhalten
+    /// Preserve namespace prefixes
     #[arg(long)]
     preserve_prefixes: bool,
 
-    /// Lexikalische Werte erhalten
+    /// Preserve lexical values
     #[arg(long)]
     preserve_lexical: bool,
 
-    /// Insignifikanten Whitespace beibehalten (Default: wird gestrippt)
+    /// Preserve insignificant whitespace (default: stripped)
     #[arg(long)]
     preserve_whitespace: bool,
 
-    /// Self-Contained Fragmente aktivieren (Spec 8.5.4.4.1)
+    /// Enable self-contained fragments (Spec 8.5.4.4.1)
     #[arg(long)]
     self_contained: bool,
 
-    /// Self-Contained nur fuer bestimmte Elemente (URI LOCAL), wiederholbar
+    /// Self-contained only for specific elements (URI LOCAL), repeatable
     #[arg(long, value_names = ["URI", "LOCAL"], num_args = 2, action = clap::ArgAction::Append)]
     self_contained_qname: Vec<String>,
 
-    /// Schema-ID im EXI-Header (Spec 5.4)
+    /// Schema ID in EXI header (Spec 5.4)
     #[arg(long, conflicts_with_all = ["schema_id_none", "schema_id_builtin"])]
     schema_id: Option<String>,
 
-    /// Schema-ID = None (xsi:nil=true)
+    /// Schema ID = None (xsi:nil=true)
     #[arg(long, conflicts_with_all = ["schema_id", "schema_id_builtin"])]
     schema_id_none: bool,
 
-    /// Schema-ID = BuiltinOnly (leerer String)
+    /// Schema ID = BuiltinOnly (empty string)
     #[arg(long, conflicts_with_all = ["schema_id", "schema_id_none"])]
     schema_id_builtin: bool,
 
-    /// Datatype Representation Map Entry (TYPE_URI TYPE_LOCAL REP_URI REP_LOCAL), wiederholbar
+    /// Datatype Representation Map entry (TYPE_URI TYPE_LOCAL REP_URI REP_LOCAL), repeatable
     #[arg(long, value_names = ["TYPE_URI", "TYPE_LOCAL", "REP_URI", "REP_LOCAL"], num_args = 4, action = clap::ArgAction::Append)]
     dtrm: Vec<String>,
 
     // -- Erweitert --
-    /// Parallele DEFLATE-Kompression (erfordert --compression)
+    /// Parallel DEFLATE compression (requires --compression)
     #[arg(long, requires = "compression")]
     parallel_deflate: bool,
 
-    /// Compression Block Size
+    /// Compression block size
     #[arg(long, default_value_t = 1_000_000)]
     block_size: u32,
 
-    /// String Table max. Wert-Laenge
+    /// String table max value length
     #[arg(long)]
     value_max_length: Option<u32>,
 
-    /// String Table Partitions-Kapazitaet
+    /// String table partitions capacity
     #[arg(long)]
     value_capacity: Option<u32>,
 
-    /// RAM-Monitoring deaktivieren
+    /// Disable memory monitoring
     #[arg(long)]
     no_memory_monitor: bool,
 }

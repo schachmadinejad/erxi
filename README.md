@@ -124,7 +124,7 @@ erxi json encode -i data.json --exi4json-other
 | `-o, --output <FILE>` | Output file (optional; without `-o` auto-derived, `-o -` = stdout) |
 | `-s, --schema <FILE>` | XSD schema file |
 | `--schema-id <ID>` | Schema ID in EXI header |
-| `--pretty` | Pretty-printed Ausgabe (nur `decode` / `json decode`) |
+| `--pretty` | Pretty-printed output (only `decode` / `json decode`) |
 | `--schema-id-none` | Schema ID = None (xsi:nil=true) |
 | `--schema-id-builtin` | Schema ID = BuiltinOnly (empty string) |
 | `--byte-aligned` | Byte alignment |
