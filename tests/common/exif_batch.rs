@@ -116,6 +116,7 @@ fn exif_batch_call(args: &[String]) -> Result<(), String> {
     })
 }
 
+#[allow(dead_code)]
 fn exificient_encode(
     xml_path: &Path,
     opts: &ExiOptions,

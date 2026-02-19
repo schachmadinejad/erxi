@@ -17,24 +17,6 @@ use crate::{Error, Result, boolean, n_bit_unsigned_integer, string, unsigned_int
 /// Maximale Länge eines schemaId-Strings (64 KiB, DoS-Schutz).
 const MAX_SCHEMA_ID_LENGTH: usize = 65_536;
 
-/// Decodiert einen String mit Längenlimit (Länge wird VOR Allokation geprüft).
-fn decode_limited_string(reader: &mut BitReader, max_len: usize) -> Result<String> {
-    let len = unsigned_integer::decode(reader)?;
-    if len > max_len as u64 {
-        return Err(Error::StringLengthExceeded { length: len, max: max_len as u32 });
-    }
-    let mut s = String::with_capacity(len as usize);
-    for _ in 0..len {
-        let cp = unsigned_integer::decode(reader)?;
-        let ch = u32::try_from(cp)
-            .ok()
-            .and_then(char::from_u32)
-            .ok_or_else(|| Error::InvalidCodePoint(cp))?;
-        s.push(ch);
-    }
-    Ok(s)
-}
-
 // ============================================================================
 // Mini-String-Table für Options-Header QName-Encoding (Spec D.1, D.3)
 // ============================================================================
@@ -652,25 +634,40 @@ fn encode_common_content(writer: &mut BitWriter, opts: &ExiOptions) -> Result<()
 }
 
 /// Encodiert schemaId-Content (nillable string).
-/// SchemaIdContent: AT(xsi:nil)=0, CH=1, EE=2 (2 bits)
+///
+/// Event Codes (variable length, EXIficient-kompatibel):
+/// - CH = `0` (1 bit) → String-Value (Spec 7.3.3, length+2)
+/// - AT(xsi:nil) = `10` (2 bits) → Bool + AfterNilAttr (CH/EE, 1 bit)
+/// - EE = `11` (2 bits) → leeres Element (BuiltinOnly)
 fn encode_schema_id_content(writer: &mut BitWriter, schema_id: &SchemaId) {
     match schema_id {
         SchemaId::None => {
-            // Spec 5.4: AT(xsi:nil)=true, dann EE
-            n_bit_unsigned_integer::encode(writer, 0, 2); // AT(xsi:nil) [SchemaIdContent Code 0]
-            writer.write_bit(true); // xsi:nil="true"
-            n_bit_unsigned_integer::encode(writer, 1, 1); // EE [AfterNilAttr Code 1]
+            // AT(xsi:nil)=true, dann EE → `10` + true + `1`
+            n_bit_unsigned_integer::encode(writer, 1, 1); // nicht CH (→ AT oder EE)
+            n_bit_unsigned_integer::encode(writer, 0, 1); // AT(xsi:nil)
+            boolean::encode(writer, true);
+            n_bit_unsigned_integer::encode(writer, 1, 1); // EE (AfterNilAttr)
         }
         SchemaId::BuiltinOnly => {
-            // CH mit leerem String
-            n_bit_unsigned_integer::encode(writer, 1, 2);
-            string::encode(writer, "");
+            // EE ohne Content → `11`
+            n_bit_unsigned_integer::encode(writer, 1, 1); // nicht CH (→ AT oder EE)
+            n_bit_unsigned_integer::encode(writer, 1, 1); // EE
         }
         SchemaId::Id(s) => {
-            // CH mit Schema-ID String
-            n_bit_unsigned_integer::encode(writer, 1, 2);
-            string::encode(writer, s);
+            // CH mit Schema-ID String (Value-Encoding length+2)
+            n_bit_unsigned_integer::encode(writer, 0, 1); // CH
+            encode_schema_id_value(writer, s);
         }
+    }
+}
+
+/// Encodiert schemaId-String als EXI Value (Spec 7.3.3, length+2).
+fn encode_schema_id_value(writer: &mut BitWriter, value: &str) {
+    if value.is_ascii() {
+        unsigned_integer::encode(writer, value.len() as u64 + 2);
+        writer.write_bytes_aligned(value.as_bytes());
+    } else {
+        string::encode_non_ascii(writer, value, 2);
     }
 }
 
@@ -985,43 +982,57 @@ fn schema_id_from_string(s: String) -> SchemaId {
 }
 
 fn decode_schema_id_content(reader: &mut BitReader) -> Result<SchemaId> {
-    // SchemaIdContent: AT(xsi:nil)=0, CH=1, EE=2 (2 bits)
-    let code = n_bit_unsigned_integer::decode(reader, 2)?;
-
-    match code {
-        0 => {
-            // AT(xsi:nil)
-            let nil_value = boolean::decode(reader)?;
-            // AfterNilAttr: CH=0, EE=1 (1 bit)
-            let code2 = n_bit_unsigned_integer::decode(reader, 1)?;
-
-            if nil_value {
-                // xsi:nil=true → nur EE erlaubt
-                if code2 == 0 {
-                    return Err(Error::schema_violation("schemaId: xsi:nil=true verlangt EE, aber CH gefunden"));
-                }
-                Ok(SchemaId::None)
-            } else {
-                // xsi:nil=false → CH required
-                if code2 == 1 {
-                    return Err(Error::schema_violation("schemaId: xsi:nil=false verlangt CH, aber EE gefunden"));
-                }
-                let s = decode_limited_string(reader, MAX_SCHEMA_ID_LENGTH)?;
-                Ok(schema_id_from_string(s))
-            }
-        }
-        1 => {
-            // CH (ohne vorheriges AT)
-            let s = decode_limited_string(reader, MAX_SCHEMA_ID_LENGTH)?;
-            Ok(schema_id_from_string(s))
-        }
-        2 => {
-            // EE ohne CH oder AT → implizites xsi:nil=true.
-            // Exificient verwendet diese Kurzform. Wird beim Decode toleriert.
-            Ok(SchemaId::None)
-        }
-        _ => Err(Error::invalid_event_code("unerwarteter Code", "schemaId")),
+    // SchemaIdContent (variable length):
+    // - CH = 0 (1 bit) → String-Value (length+2)
+    // - AT(xsi:nil) = 10 (2 bits) → Bool + AfterNilAttr (CH/EE, 1 bit)
+    // - EE = 11 (2 bits) → BuiltinOnly
+    let first = n_bit_unsigned_integer::decode(reader, 1)?;
+    if first == 0 {
+        let s = decode_schema_id_value(reader)?;
+        return Ok(schema_id_from_string(s));
     }
+
+    let second = n_bit_unsigned_integer::decode(reader, 1)?;
+    if second == 1 {
+        return Ok(SchemaId::BuiltinOnly);
+    }
+
+    // AT(xsi:nil)
+    let nil_value = boolean::decode(reader)?;
+    let code = n_bit_unsigned_integer::decode(reader, 1)?; // AfterNilAttr: CH=0, EE=1
+    if nil_value {
+        if code == 0 {
+            return Err(Error::schema_violation("schemaId: xsi:nil=true verlangt EE, aber CH gefunden"));
+        }
+        return Ok(SchemaId::None);
+    }
+
+    if code == 1 {
+        return Err(Error::schema_violation("schemaId: xsi:nil=false verlangt CH, aber EE gefunden"));
+    }
+    let s = decode_schema_id_value(reader)?;
+    Ok(schema_id_from_string(s))
+}
+
+fn decode_schema_id_value(reader: &mut BitReader) -> Result<String> {
+    let indicator = unsigned_integer::decode(reader)?;
+    if indicator < 2 {
+        return Err(Error::invalid_event_code("schemaId: string table hits nicht unterstützt", "schemaId"));
+    }
+    let len = indicator - 2;
+    if len > MAX_SCHEMA_ID_LENGTH as u64 {
+        return Err(Error::StringLengthExceeded { length: len, max: MAX_SCHEMA_ID_LENGTH as u32 });
+    }
+    let mut s = String::with_capacity(len as usize);
+    for _ in 0..len {
+        let cp = unsigned_integer::decode(reader)?;
+        let ch = u32::try_from(cp)
+            .ok()
+            .and_then(char::from_u32)
+            .ok_or_else(|| Error::InvalidCodePoint(cp))?;
+        s.push(ch);
+    }
+    Ok(s)
 }
 
 /// Decodiert unsignedInt-Content als u64.
@@ -1458,8 +1469,7 @@ mod tests {
         assert_eq!(encoded, vec![0b0010_1110]);
     }
 
-    /// Spec 5.4: schemaId=None (implizites xsi:nil=true via EE) encodiert.
-    /// Spec-Abweichung: EE statt AT(xsi:nil)=true, spart 2 Bits.
+    /// Spec 5.4: schemaId=None (xsi:nil=true) encodiert.
     #[test]
     fn golden_vector_schema_id_none() {
         let opts = ExiOptions {
@@ -1471,12 +1481,12 @@ mod tests {
         // SE(header) = 0 → `0` (1 bit)
         // HeaderContent: SE(common) = 1 → `01` (2 bits)
         // CommonContent: SE(schemaId) = 2 → `10` (2 bits)
-        // SchemaIdContent: AT(xsi:nil) = 0 → `00` (2 bits)
+        // SchemaIdContent: AT(xsi:nil) = `10` (2 bits)
         // xsi:nil value: true → `1` (1 bit)
         // AfterNilAttr: EE = 1 → `1` (1 bit)
         // AfterCommon: EE = 1 → `1` (1 bit)
-        // Total: `0_01_10_00_1_1_1` = 10 bits → 2 bytes
-        assert_eq!(encoded, vec![0x31, 0xC0]);
+        // Total: `0_01_10_10_1_1_1` = 10 bits → 2 bytes
+        assert_eq!(encoded, vec![0x35, 0xC0]);
     }
 
     /// Spec 5.4: schemaId=BuiltinOnly (leerer String) encodiert.
@@ -1491,11 +1501,10 @@ mod tests {
         // SE(header) = 0 → `0` (1 bit)
         // HeaderContent: SE(common) = 1 → `01` (2 bits)
         // CommonContent: SE(schemaId) = 2 → `10` (2 bits)
-        // SchemaIdContent: CH = 1 → `01` (2 bits)
-        // CH value: leerer String → length=0 → `0000_0000` (8 bits)
+        // SchemaIdContent: EE = `11` (2 bits)
         // AfterCommon: EE = 1 → `1` (1 bit)
-        // Total: `0_01_10_01_00000000_1` = 16 bits → 0b0011_0010, 0b0000_0001
-        assert_eq!(encoded, vec![0b0011_0010, 0b0000_0001]);
+        // Total: `0_01_10_11_1` = 8 bits → 0b0011_0111
+        assert_eq!(encoded, vec![0b0011_0111]);
     }
 
     /// Spec 5.4: alignment=ByteAlignment encodiert.
@@ -1645,10 +1654,7 @@ mod tests {
         assert_eq!(result.unwrap_err(), Error::InvalidOptionCombination);
     }
 
-    /// Spec 5.4: schemaId mit EE ohne CH/AT → Exificient-kompatibel: SchemaId::None.
-    ///
-    /// Exificient verwendet EE ohne AT(xsi:nil) als Kurzform für xsi:nil=true.
-    /// Wir akzeptieren diese Interpretation für Interoperabilität.
+    /// Spec 5.4: schemaId mit EE ohne CH/AT → BuiltinOnly (leerer String).
     #[test]
     fn decode_schema_id_ee_without_content() {
         // Manuell konstruierter Stream: SE(header) + SE(common) + SE(schemaId) + EE + EE
@@ -1656,13 +1662,13 @@ mod tests {
         n_bit_unsigned_integer::encode(&mut writer, 0, 1); // SE(header)
         n_bit_unsigned_integer::encode(&mut writer, 1, 2); // SE(common)
         n_bit_unsigned_integer::encode(&mut writer, 2, 2); // SE(schemaId)
-        n_bit_unsigned_integer::encode(&mut writer, 2, 2); // EE (ohne CH/AT)
+        n_bit_unsigned_integer::encode(&mut writer, 1, 1); // prefix: not CH
+        n_bit_unsigned_integer::encode(&mut writer, 1, 1); // EE (ohne CH/AT)
         // AfterCommon: EE = 1 (1 bit)
         n_bit_unsigned_integer::encode(&mut writer, 1, 1); // EE(common)
         let data = writer.into_vec();
         let result = decode_from_slice(&data).unwrap();
-        // Exificient-kompatibel: EE = SchemaId::None
-        assert_eq!(result.schema_id, Some(SchemaId::None));
+        assert_eq!(result.schema_id, Some(SchemaId::BuiltinOnly));
     }
 
     /// Spec 5.4: schemaId mit xsi:nil=true + CH → SchemaViolation.
@@ -1672,7 +1678,8 @@ mod tests {
         n_bit_unsigned_integer::encode(&mut writer, 0, 1); // SE(header)
         n_bit_unsigned_integer::encode(&mut writer, 1, 2); // SE(common)
         n_bit_unsigned_integer::encode(&mut writer, 2, 2); // SE(schemaId)
-        n_bit_unsigned_integer::encode(&mut writer, 0, 2); // AT(xsi:nil)
+        n_bit_unsigned_integer::encode(&mut writer, 1, 1); // prefix: not CH
+        n_bit_unsigned_integer::encode(&mut writer, 0, 1); // AT(xsi:nil)
         boolean::encode(&mut writer, true); // nil=true
         n_bit_unsigned_integer::encode(&mut writer, 0, 1); // CH (ungültig nach nil=true)
         let data = writer.into_vec();
@@ -1687,7 +1694,8 @@ mod tests {
         n_bit_unsigned_integer::encode(&mut writer, 0, 1); // SE(header)
         n_bit_unsigned_integer::encode(&mut writer, 1, 2); // SE(common)
         n_bit_unsigned_integer::encode(&mut writer, 2, 2); // SE(schemaId)
-        n_bit_unsigned_integer::encode(&mut writer, 0, 2); // AT(xsi:nil)
+        n_bit_unsigned_integer::encode(&mut writer, 1, 1); // prefix: not CH
+        n_bit_unsigned_integer::encode(&mut writer, 0, 1); // AT(xsi:nil)
         boolean::encode(&mut writer, false); // nil=false
         n_bit_unsigned_integer::encode(&mut writer, 1, 1); // EE (ohne CH, ungültig)
         let data = writer.into_vec();
@@ -2262,15 +2270,13 @@ mod tests {
         let mut writer = BitWriter::new();
         // CommonContent: SE(schemaId) = 2 (2 bits)
         n_bit_unsigned_integer::encode(&mut writer, 2, 2);
-        // SchemaIdContent: CH = 1 (2 bits)
-        n_bit_unsigned_integer::encode(&mut writer, 1, 2);
-        // String mit exakt MAX_SCHEMA_ID_LENGTH Zeichen
-        unsigned_integer::encode(&mut writer, MAX_SCHEMA_ID_LENGTH as u64);
+        // SchemaIdContent: CH = 0 (1 bit)
+        n_bit_unsigned_integer::encode(&mut writer, 0, 1);
+        // String mit exakt MAX_SCHEMA_ID_LENGTH Zeichen (Value-Encoding: length+2)
+        unsigned_integer::encode(&mut writer, MAX_SCHEMA_ID_LENGTH as u64 + 2);
         for _ in 0..MAX_SCHEMA_ID_LENGTH {
             unsigned_integer::encode(&mut writer, 'A' as u64);
         }
-        // EE fuer SchemaIdContent
-        n_bit_unsigned_integer::encode(&mut writer, 2, 2);
 
         let data = writer.into_vec();
         let mut reader = BitReader::new(&data);
@@ -2287,16 +2293,14 @@ mod tests {
         let mut writer = BitWriter::new();
         // CommonContent: SE(schemaId) = 2 (2 bits)
         n_bit_unsigned_integer::encode(&mut writer, 2, 2);
-        // SchemaIdContent: CH = 1 (2 bits)
-        n_bit_unsigned_integer::encode(&mut writer, 1, 2);
+        // SchemaIdContent: CH = 0 (1 bit)
+        n_bit_unsigned_integer::encode(&mut writer, 0, 1);
         // String mit 65537 'A'-Zeichen (> MAX_SCHEMA_ID_LENGTH)
         let huge_len = MAX_SCHEMA_ID_LENGTH + 1;
-        unsigned_integer::encode(&mut writer, huge_len as u64);
+        unsigned_integer::encode(&mut writer, huge_len as u64 + 2);
         for _ in 0..huge_len {
             unsigned_integer::encode(&mut writer, 'A' as u64);
         }
-        // EE für schemaId + EE für options
-        n_bit_unsigned_integer::encode(&mut writer, 0, 1); // EE schemaId
 
         let data = writer.into_vec();
         let mut reader = BitReader::new(&data);

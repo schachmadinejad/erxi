@@ -67,19 +67,53 @@ erxi encode -i document.xml -o document.exi \
 
 # Read from stdin
 cat document.xml | erxi encode -i - -o document.exi
+
+# Auto output (document.xml -> document.exi)
+erxi encode -i document.xml
+
+# To stdout
+erxi encode -i document.xml -o -
 ```
 
 ### Decode
 
 ```bash
-# To stdout
+# Auto output (document.exi -> document.xml)
 erxi decode -i document.exi
 
 # To file
 erxi decode -i document.exi -o document.xml
 
+# To stdout
+erxi decode -i document.exi -o -
+
 # With schema (when options are not in the header)
 erxi decode -i document.exi -o document.xml -s schema.xsd
+
+# Pretty-printed XML output
+erxi decode -i document.exi --pretty
+```
+
+### JSON (EXI4JSON)
+
+```bash
+# Encode JSON -> EXI4JSON (output auto: input.json -> input.exi)
+erxi json encode -i data.json
+
+# Encode JSON -> EXI4JSON to stdout
+erxi json encode -i data.json -o -
+
+# Decode EXI4JSON -> JSON (output auto: input.exi -> input.json)
+erxi json decode -i data.exi
+
+# Decode EXI4JSON -> JSON to stdout
+erxi json decode -i data.exi -o -
+
+# Pretty-printed JSON output
+erxi json decode -i data.exi --pretty
+
+# Enable EXI4JSON <other> heuristics (date/time/base64/integer/decimal)
+erxi json encode -i data.json --exi4json-other
 ```
 
 ### All CLI Options
@@ -87,9 +121,10 @@ erxi decode -i document.exi -o document.xml -s schema.xsd
 | Option | Description |
 |--------|-------------|
 | `-i, --input <FILE>` | Input file (`-` for stdin) |
-| `-o, --output <FILE>` | Output file (decode: optional, stdout) |
+| `-o, --output <FILE>` | Output file (optional; without `-o` auto-derived, `-o -` = stdout) |
 | `-s, --schema <FILE>` | XSD schema file |
 | `--schema-id <ID>` | Schema ID in EXI header |
+| `--pretty` | Pretty-printed Ausgabe (nur `decode` / `json decode`) |
 | `--schema-id-none` | Schema ID = None (xsi:nil=true) |
 | `--schema-id-builtin` | Schema ID = BuiltinOnly (empty string) |
 | `--byte-aligned` | Byte alignment |

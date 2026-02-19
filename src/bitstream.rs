@@ -552,7 +552,7 @@ mod tests {
     fn writer_default() {
         let w = BitWriter::default();
         assert_eq!(w.bit_position(), 0);
-        assert_eq!(w.into_vec(), vec![]);
+        assert!(w.into_vec().is_empty());
     }
 
     // --- Test 1: Single bit write/read (Spec 7.1 MSB first) ---
@@ -665,7 +665,7 @@ mod tests {
         let mut w = BitWriter::new();
         w.write_bits(0xFF, 0);
         assert_eq!(w.bit_position(), 0);
-        assert_eq!(w.into_vec(), vec![]);
+        assert!(w.into_vec().is_empty());
     }
 
     #[test]
@@ -721,7 +721,7 @@ mod tests {
         let mut w = BitWriter::new();
         w.align_to_byte();
         assert_eq!(w.bit_position(), 0);
-        assert_eq!(w.into_vec(), vec![]);
+        assert!(w.into_vec().is_empty());
     }
 
     #[test]
@@ -1058,7 +1058,7 @@ mod tests {
         let mut w = BitWriter::new();
         w.write_bytes_aligned(&[]);
         assert_eq!(w.bit_position(), 0);
-        assert_eq!(w.into_vec(), vec![]);
+        assert!(w.into_vec().is_empty());
     }
 
     #[test]

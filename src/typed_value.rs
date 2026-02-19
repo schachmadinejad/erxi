@@ -708,6 +708,11 @@ fn parse_datetime(
     }
 }
 
+/// Validiert einen date/time/dateTime String gegen die EXI Datetime-Regeln.
+pub fn is_valid_datetime(value: &str, dt_type: crate::datetime::DateTimeType) -> bool {
+    parse_datetime(value, dt_type).is_ok()
+}
+
 /// Extrahiert Timezone-Offset aus ISO-8601 String.
 fn extract_timezone(value: &str) -> Result<(&str, Option<i16>)> {
     if let Some(without_z) = value.strip_suffix('Z') {

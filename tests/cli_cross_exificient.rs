@@ -79,15 +79,13 @@ fn ensure_exificient_env() -> bool {
         return false;
     }
 
-    if std::env::var("EXIFICIENT_JAR").is_err() {
-        let cp = jars
-            .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join(":");
-        unsafe {
-            std::env::set_var("EXIFICIENT_JAR", cp);
-        }
+    let cp = jars
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join(":");
+    unsafe {
+        std::env::set_var("EXIFICIENT_JAR", cp);
     }
 
     let exifbatch_java = Path::new("tools/ExifBatch.java");

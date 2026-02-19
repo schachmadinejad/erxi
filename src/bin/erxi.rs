@@ -7,7 +7,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use clap::{Args, Parser, Subcommand};
 use erxi::encoder::EncoderConfig;
 use erxi::options::{Alignment, DatatypeRepresentationMapping, ExiOptions, Preserve, SchemaId};
-use erxi::xml_serializer::events_to_xml_iter_fallible;
+use erxi::xml_serializer::{events_to_pretty_xml_writer, events_to_xml_iter_fallible};
 use erxi::xsd::parse_xsd_with_imports;
 use erxi::Error;
 use erxi::ExiEvent;
@@ -20,7 +20,7 @@ const ENCODE_FLUSH_BYTES: usize = 8 * 1024 * 1024;
 
 fn encode_event_with_flush(
     encoder: &mut erxi::encoder::Encoder,
-    writer: &mut Option<std::io::BufWriter<std::fs::File>>,
+    writer: &mut Option<std::io::BufWriter<Box<dyn Write>>>,
     event: ExiEvent,
 ) -> Result<(), erxi::Error> {
     encoder.encode_event(&event)?;
@@ -33,7 +33,7 @@ fn encode_event_with_flush(
 }
 
 #[derive(Parser)]
-#[command(name = "erxi", about = "XML <-> EXI Konvertierung")]
+#[command(name = "erxi", about = "XML/JSON <-> EXI Konvertierung")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -45,6 +45,19 @@ enum Command {
     Encode(EncodeArgs),
     /// EXI nach XML decodieren
     Decode(DecodeArgs),
+    /// JSON <-> EXI4JSON Konvertierung
+    Json {
+        #[command(subcommand)]
+        command: JsonCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum JsonCommand {
+    /// JSON nach EXI4JSON encodieren
+    Encode(JsonEncodeArgs),
+    /// EXI4JSON nach JSON decodieren
+    Decode(JsonDecodeArgs),
 }
 
 #[derive(Args)]
@@ -69,6 +82,40 @@ struct EncodeArgs {
 struct DecodeArgs {
     #[command(flatten)]
     common: CommonArgs,
+
+    /// Pretty-printed XML-Ausgabe (2 Spaces Einzug)
+    #[arg(long)]
+    pretty: bool,
+}
+
+#[derive(Args)]
+struct JsonEncodeArgs {
+    /// Eingabedatei (- fuer stdin)
+    #[arg(short, long)]
+    input: String,
+
+    /// Ausgabedatei (optional; ohne -o wird automatisch abgeleitet, -o - = stdout)
+    #[arg(short, long)]
+    output: Option<String>,
+
+    /// EXI4JSON <other>-Typen heuristisch aktivieren (date/time/base64/integer/decimal)
+    #[arg(long)]
+    exi4json_other: bool,
+}
+
+#[derive(Args)]
+struct JsonDecodeArgs {
+    /// Eingabedatei (- fuer stdin)
+    #[arg(short, long)]
+    input: String,
+
+    /// Ausgabedatei (optional; ohne -o wird automatisch abgeleitet, -o - = stdout)
+    #[arg(short, long)]
+    output: Option<String>,
+
+    /// Pretty-printed JSON-Ausgabe (2 Spaces Einzug)
+    #[arg(long)]
+    pretty: bool,
 }
 
 #[derive(Args)]
@@ -77,7 +124,7 @@ struct CommonArgs {
     #[arg(short, long)]
     input: String,
 
-    /// Ausgabedatei (encode: erforderlich, decode: optional/stdout)
+    /// Ausgabedatei (optional; ohne -o wird automatisch abgeleitet, -o - = stdout)
     #[arg(short, long)]
     output: Option<String>,
 
@@ -314,6 +361,7 @@ fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
         Command::Encode(args) => run_encode(args),
         Command::Decode(args) => run_decode(args),
+        Command::Json { command } => run_json(command),
     }
 }
 
@@ -337,11 +385,11 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
     opts.validate()
         .map_err(|e| format!("Ungueltige Optionen: {e}"))?;
 
-    let output_path = args
-        .common
-        .output
-        .as_deref()
-        .ok_or("encode erfordert -o <datei>")?;
+    let output_path = resolve_output_path(args.common.output.as_deref(), &args.common.input, "exi")?;
+    let to_stdout = output_path == "-";
+    let tmp_path = if to_stdout { None } else { Some(format!("{output_path}.tmp")) };
+    // Pfad fuer BufWriter: tmp-Datei oder stdout ("-")
+    let writer_target = tmp_path.as_deref().unwrap_or("-");
 
     let schema = args.common.schema.as_ref()
         .map(|p| parse_xsd_with_imports(Path::new(p)))
@@ -376,14 +424,10 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
 
     // Streaming von stdin (keine DTD-Entity-Aufloesung wie beim alten stdin-Pfad)
     if args.common.input == "-" && can_stream_stdin(&opts) {
-        let tmp_path = format!("{output_path}.tmp");
         let stdin = std::io::stdin();
         let result = erxi::streaming::encode_xml_stream_with_config_and_dtd_guard(
             stdin.lock(),
-            std::io::BufWriter::new(
-                std::fs::File::create(&tmp_path)
-                    .map_err(|e| format!("Schreibfehler: {e}"))?,
-            ),
+            create_buf_writer(writer_target)?,
             &opts,
             schema.as_ref(),
             config.clone(),
@@ -391,30 +435,16 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
             create_memory_monitor(&args.common),
             false,
         );
-        match result {
-            Ok(()) => {
-                std::fs::rename(&tmp_path, output_path)
-                    .map_err(|e| format!("Rename-Fehler: {e}"))?;
-                return Ok(());
-            }
-            Err(e) => {
-                let _ = std::fs::remove_file(&tmp_path);
-                return Err(format!("Encode-Fehler: {e}"));
-            }
-        }
+        return finish_tmp_output(result.map_err(|e| format!("Encode-Fehler: {e}")), tmp_path.as_deref(), &output_path);
     }
 
     // Streaming-Pfad fuer grosse Dateien (begrenzter Speicher)
     if can_stream_file(&args, &opts) {
-        let tmp_path = format!("{output_path}.tmp");
         let input_path = Path::new(&args.common.input);
         let result = erxi::streaming::encode_xml_stream_with_config(
             std::fs::File::open(input_path)
                 .map_err(|e| format!("Lesefehler '{}': {e}", args.common.input))?,
-            std::io::BufWriter::new(
-                std::fs::File::create(&tmp_path)
-                    .map_err(|e| format!("Schreibfehler: {e}"))?,
-            ),
+            create_buf_writer(writer_target)?,
             &opts,
             schema.as_ref(),
             config.clone(),
@@ -423,19 +453,23 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
         );
         match result {
             Ok(()) => {
-                std::fs::rename(&tmp_path, output_path)
-                    .map_err(|e| format!("Rename-Fehler: {e}"))?;
-                return Ok(());
+                return finish_tmp_output(Ok(()), tmp_path.as_deref(), &output_path);
             }
             Err(erxi::Error::DtdRequiresBatchApi) => {
                 eprintln!("Hinweis: DTD-Entities erkannt, wechsle auf Batch-Modus...");
             }
             Err(e) => {
-                let _ = std::fs::remove_file(&tmp_path);
-                return Err(format!("Encode-Fehler: {e}"));
+                return finish_tmp_output(
+                    Err(format!("Encode-Fehler: {e}")),
+                    tmp_path.as_deref(),
+                    &output_path,
+                );
             }
         }
-        let _ = std::fs::remove_file(&tmp_path);
+        // DTD-Fallback: tmp-Datei aufraumen bevor Batch-Pfad beginnt
+        if let Some(ref path) = tmp_path {
+            let _ = std::fs::remove_file(path);
+        }
     }
 
     // Batch-Pfad: Callback-basiert (kein Events Vec im Speicher)
@@ -446,15 +480,8 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
 
     let wants_stream_output = !opts.compression()
         && !matches!(opts.alignment(), Alignment::PreCompression);
-    let tmp_path = if wants_stream_output {
-        Some(format!("{output_path}.tmp"))
-    } else {
-        None
-    };
-    let mut output_writer = if let Some(ref path) = tmp_path {
-        Some(std::io::BufWriter::new(
-            std::fs::File::create(path).map_err(|e| format!("Schreibfehler: {e}"))?,
-        ))
+    let mut output_writer: Option<std::io::BufWriter<Box<dyn Write>>> = if wants_stream_output {
+        Some(create_buf_writer(writer_target)?)
     } else {
         None
     };
@@ -472,10 +499,7 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
                 if let Some(path) = tmp_path.as_deref() {
                     output_writer.take();
                     let _ = std::fs::remove_file(path);
-                    output_writer = Some(std::io::BufWriter::new(
-                        std::fs::File::create(path)
-                            .map_err(|e| format!("Schreibfehler: {e}"))?,
-                    ));
+                    output_writer = Some(create_buf_writer(path)?);
                 }
                 // Neuen Encoder — der alte hat bereits inkonsistenten State
                 encoder = create_configured_encoder(
@@ -502,7 +526,13 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
     if opts.compression() || matches!(opts.alignment(), Alignment::PreCompression) {
         // Compression/PreCompression erfordern vollständiges Buffering (Spec 9)
         let bytes = encoder.finish().map_err(|e| format!("Encode-Fehler: {e}"))?;
-        std::fs::write(output_path, bytes).map_err(|e| format!("Schreibfehler: {e}"))?;
+        if to_stdout {
+            std::io::stdout()
+                .write_all(&bytes)
+                .map_err(|e| format!("Schreibfehler (stdout): {e}"))?;
+        } else {
+            std::fs::write(&output_path, bytes).map_err(|e| format!("Schreibfehler: {e}"))?;
+        }
     } else {
         // BitPacked/ByteAlignment: direkt in Datei schreiben (kein Vec<u8> im RAM)
         let mut writer = output_writer
@@ -512,7 +542,7 @@ fn run_encode(args: EncodeArgs) -> Result<(), String> {
             .map_err(|e| format!("Encode-Fehler: {e}"))?;
         writer.flush().map_err(|e| format!("Schreibfehler: {e}"))?;
         if let Some(path) = tmp_path.as_deref() {
-            std::fs::rename(path, output_path)
+            std::fs::rename(path, &output_path)
                 .map_err(|e| format!("Rename-Fehler: {e}"))?;
         }
     }
@@ -578,6 +608,59 @@ fn create_configured_encoder(
     Ok(encoder)
 }
 
+/// Erstellt einen BufWriter fuer stdout oder eine Datei.
+fn create_buf_writer(path: &str) -> Result<std::io::BufWriter<Box<dyn Write>>, String> {
+    if path == "-" {
+        Ok(std::io::BufWriter::new(Box::new(std::io::stdout())))
+    } else {
+        let file = std::fs::File::create(path)
+            .map_err(|e| format!("Schreibfehler: {e}"))?;
+        Ok(std::io::BufWriter::new(Box::new(file)))
+    }
+}
+
+/// Schreibt Output entweder nach stdout ("-") oder atomar in eine Datei (tmp+rename).
+///
+/// Die Closure bekommt einen BufWriter und schreibt darin.
+/// Bei Datei-Output wird erst in eine .tmp-Datei geschrieben und bei Erfolg umbenannt.
+fn write_to_output(
+    output_path: &str,
+    write_fn: impl FnOnce(std::io::BufWriter<Box<dyn Write>>) -> Result<(), String>,
+) -> Result<(), String> {
+    if output_path == "-" {
+        return write_fn(create_buf_writer("-")?);
+    }
+
+    let tmp_path = format!("{output_path}.tmp");
+    let writer = create_buf_writer(&tmp_path)?;
+    if let Err(e) = write_fn(writer) {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(e);
+    }
+    std::fs::rename(&tmp_path, output_path)
+        .map_err(|e| format!("Rename-Fehler: {e}"))
+}
+
+/// Bei Erfolg: tmp-Datei auf Ziel umbenennen. Bei Fehler: tmp-Datei loeschen.
+/// Fuer stdout-Output (tmp_path=None) wird nur der Result durchgereicht.
+fn finish_tmp_output(
+    result: Result<(), String>,
+    tmp_path: Option<&str>,
+    output_path: &str,
+) -> Result<(), String> {
+    match (&result, tmp_path) {
+        (Ok(()), Some(tmp)) => {
+            std::fs::rename(tmp, output_path)
+                .map_err(|e| format!("Rename-Fehler: {e}"))
+        }
+        (Err(_), Some(tmp)) => {
+            let _ = std::fs::remove_file(tmp);
+            result
+        }
+        _ => result,
+    }
+}
+
 fn run_decode(args: DecodeArgs) -> Result<(), String> {
     let opts = args.common.to_options();
 
@@ -598,22 +681,90 @@ fn run_decode(args: DecodeArgs) -> Result<(), String> {
         iter.set_memory_monitor(monitor);
     }
 
-    if let Some(ref output_path) = args.common.output {
-        let tmp_path = format!("{output_path}.tmp");
-        let file = std::fs::File::create(&tmp_path)
-            .map_err(|e| format!("Schreibfehler: {e}"))?;
-        if let Err(e) = events_to_xml_iter_fallible(iter, std::io::BufWriter::new(file)) {
-            let _ = std::fs::remove_file(&tmp_path);
-            return Err(format!("Serialisierungs-Fehler: {e}"));
-        }
-        std::fs::rename(&tmp_path, output_path)
-            .map_err(|e| format!("Rename-Fehler: {e}"))?;
-    } else {
-        events_to_xml_iter_fallible(iter, std::io::BufWriter::new(std::io::stdout().lock()))
-            .map_err(|e| format!("Serialisierungs-Fehler: {e}"))?;
-    }
+    let output_path = resolve_output_path(args.common.output.as_deref(), &args.common.input, "xml")?;
 
-    Ok(())
+    if args.pretty {
+        let mut events = Vec::new();
+        for ev in iter {
+            events.push(ev.map_err(|e| format!("Decode-Fehler: {e}"))?);
+        }
+        write_to_output(&output_path, |writer| {
+            events_to_pretty_xml_writer(&events, writer)
+                .map_err(|e| format!("Serialisierungs-Fehler: {e}"))
+        })
+    } else {
+        write_to_output(&output_path, |writer| {
+            events_to_xml_iter_fallible(iter, writer)
+                .map_err(|e| format!("Serialisierungs-Fehler: {e}"))
+        })
+    }
+}
+
+fn run_json(cmd: JsonCommand) -> Result<(), String> {
+    match cmd {
+        JsonCommand::Encode(args) => run_json_encode(args),
+        JsonCommand::Decode(args) => run_json_decode(args),
+    }
+}
+
+fn run_json_encode(args: JsonEncodeArgs) -> Result<(), String> {
+    let input = read_input(&args.input)?;
+    let json = std::str::from_utf8(&input)
+        .map_err(|e| format!("JSON muss UTF-8 sein: {e}"))?;
+
+    let exi = erxi::encode_json_with_options(
+        json,
+        erxi::Exi4JsonOptions { use_other_types: args.exi4json_other },
+    ).map_err(|e| format!("EXI4JSON Encode-Fehler: {e}"))?;
+
+    let output = resolve_output_path(args.output.as_deref(), &args.input, "exi")?;
+
+    write_to_output(&output, |mut writer| {
+        writer.write_all(&exi)
+            .map_err(|e| format!("Schreibfehler: {e}"))
+    })
+}
+
+fn run_json_decode(args: JsonDecodeArgs) -> Result<(), String> {
+    let input = load_decode_input(&args.input)?;
+    let json = erxi::decode_json(&input)
+        .map_err(|e| format!("EXI4JSON Decode-Fehler: {e}"))?;
+    let json = if args.pretty {
+        let value: serde_json::Value = serde_json::from_str(&json)
+            .map_err(|e| format!("JSON parse error: {e}"))?;
+        serde_json::to_string_pretty(&value)
+            .map_err(|e| format!("JSON encode error: {e}"))?
+    } else {
+        json
+    };
+
+    let output = resolve_output_path(args.output.as_deref(), &args.input, "json")?;
+
+    write_to_output(&output, |mut writer| {
+        writer.write_all(json.as_bytes())
+            .map_err(|e| format!("Schreibfehler: {e}"))?;
+        writer.write_all(b"\n")
+            .map_err(|e| format!("Schreibfehler: {e}"))
+    })
+}
+
+/// Leitet den Output-Pfad aus der Eingabe und der gewuenschten Extension ab.
+///
+/// Bei explizitem `-o` wird dieser Pfad direkt verwendet. Ohne `-o` wird
+/// die Extension der Eingabedatei ersetzt (bzw. angehaengt wenn keine vorhanden).
+fn resolve_output_path(explicit: Option<&str>, input: &str, ext: &str) -> Result<String, String> {
+    if let Some(path) = explicit {
+        return Ok(path.to_string());
+    }
+    if input == "-" {
+        return Err("ohne -o braucht es eine Eingabedatei (nicht stdin)".into());
+    }
+    let path = std::path::Path::new(input);
+    let stem = path.file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| "ungueltiger Eingabepfad".to_string())?;
+    let parent = path.parent().unwrap_or_else(|| std::path::Path::new(""));
+    Ok(parent.join(format!("{stem}.{ext}")).to_string_lossy().to_string())
 }
 
 fn validate_schema_option_requirements(opts: &ExiOptions, has_schema: bool) -> Result<(), String> {

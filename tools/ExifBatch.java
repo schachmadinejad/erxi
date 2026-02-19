@@ -68,7 +68,8 @@ public class ExifBatch {
                 com.siemens.ct.exi.main.cmd.EXIficientCMD.main(cmdArgs);
 
                 String errStr = capturedErr.toString().trim();
-                if (!errStr.isEmpty() && errStr.contains("Error")) {
+                String errLower = errStr.toLowerCase();
+                if (!errStr.isEmpty() && (errLower.contains("error") || errLower.contains("exception"))) {
                     System.setOut(origOut);
                     System.setErr(origErr);
                     origOut.println("ERROR: " + errStr.replace("\n", " "));

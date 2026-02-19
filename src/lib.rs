@@ -37,6 +37,7 @@ pub mod error;
 pub mod event;
 pub mod event_code;
 pub mod event_content;
+pub mod exi4json;
 pub mod float;
 pub mod grammar;
 pub mod header;
@@ -95,6 +96,7 @@ pub use encoder::{EncoderConfig, encode_with_schema, encode_with_schema_and_conf
 pub use qname::QName;
 pub use schema::SchemaInfo;
 pub use datetime::DateTime;
+pub use exi4json::{encode_json, encode_json_with_options, decode_json, Exi4JsonOptions};
 pub use typed_value::{
     get_user_defined_representation, register_user_defined_representation,
     unregister_user_defined_representation, UserDefinedDecode, UserDefinedEncode,
@@ -104,6 +106,7 @@ pub use typed_value::{
 pub use xsd::parse_xsd_with_imports;
 pub use xml::{parse_xml_events, parse_xml_events_from_str, parse_xml_events_with_options};
 pub use xml_serializer::{
+    events_to_pretty_xml, events_to_pretty_xml_iter_fallible, events_to_pretty_xml_writer,
     events_to_xml, events_to_xml_iter, events_to_xml_iter_fallible, events_to_xml_writer,
 };
 
