@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 09: Gemischte Typen — nur decimal gemappt, rest unveraendert -->
+<!-- DTRM: xsd:decimal → exi:string -->
+<mixed xmlns="http://example.org/dtrm">
+  <mapped>3.14159</mapped>
+  <unmapped>true</unmapped>
+  <text>not mapped</text>
+</mixed>

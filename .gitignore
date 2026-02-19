@@ -1,0 +1,38 @@
+
+# Added by cargo
+/target
+/tools/target
+
+# Java build artifacts (Exificient fixture generator)
+*.jar
+*.class
+
+# Benchmark/Profiling-Ergebnisse
+bench/data/profile-*/
+bench/data/profile-latest
+bench/data/*.csv
+bench/*.decoded.*
+bench/*.exi
+
+# Temporaere Dateien
+*.tmp
+.tmp_exificient/
+
+# Build-Artefakte
+tarpaulin-report.html
+
+# Lokale Konfiguration (nicht oeffentlich)
+CLAUDE.md
+CLAUDE-GLOBAL.md
+
+# W3C Spec (Copyright W3C, nicht redistribuierbar)
+spec/
+
+# Interne Arbeitsdokumente
+lastsession.md
+PLAN.md
+optimierungen.md
+OPTIMIZATION-ROADMAP.md
+DECODE-BUGS.md
+BENCHMARK-FINDINGS.md
+docs/trace-plan/

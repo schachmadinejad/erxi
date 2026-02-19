@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 07: Mehrere DTRM-Entries gleichzeitig -->
+<!-- DTRM: xsd:decimal → exi:string, xsd:boolean → exi:string, xsd:double → exi:integer -->
+<multi xmlns="http://example.org/dtrm">
+  <a>123.456</a>
+  <b>789</b>
+  <c>true</c>
+  <d>42</d>
+</multi>

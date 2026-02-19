@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 05: double→exi:string -->
+<!-- DTRM: xsd:double → exi:string -->
+<root xmlns="http://example.org/dtrm">
+  <decimalVal>55.5</decimalVal>
+  <integerVal>1000</integerVal>
+  <booleanVal>true</booleanVal>
+  <doubleVal>INF</doubleVal>
+  <stringVal>double-test</stringVal>
+  <dateVal>2020-03-15</dateVal>
+  <myDecimalVal>11.11</myDecimalVal>
+  <myIntegerVal>22</myIntegerVal>
+  <myStringVal>dbl</myStringVal>
+</root>

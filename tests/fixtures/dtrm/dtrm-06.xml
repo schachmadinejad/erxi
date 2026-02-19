@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 06: Closest Ancestor — Mapping auf decimal wird von myDecimal geerbt -->
+<!-- DTRM: xsd:decimal → exi:string -->
+<ancestor xmlns="http://example.org/dtrm">
+  <derived>99.99</derived>
+  <base>42.0</base>
+</ancestor>

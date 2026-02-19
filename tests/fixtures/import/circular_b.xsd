@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<xsd:schema targetNamespace="urn:b"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:a="urn:a"
+            xmlns:b="urn:b">
+
+<xsd:import namespace="urn:a" schemaLocation="circular_a.xsd"/>
+
+<xsd:element name="elementB" type="xsd:string"/>
+
+<xsd:complexType name="TypeB">
+  <xsd:sequence>
+    <xsd:element ref="a:rootA"/>
+  </xsd:sequence>
+</xsd:complexType>
+
+</xsd:schema>

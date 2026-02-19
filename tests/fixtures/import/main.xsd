@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<xsd:schema targetNamespace="urn:main"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:main="urn:main"
+            xmlns:lib="urn:lib">
+
+<xsd:import namespace="urn:lib" schemaLocation="lib.xsd"/>
+
+<xsd:element name="root">
+  <xsd:complexType>
+    <xsd:sequence>
+      <xsd:element ref="lib:item" maxOccurs="unbounded"/>
+    </xsd:sequence>
+    <xsd:attribute ref="lib:version"/>
+  </xsd:complexType>
+</xsd:element>
+
+<xsd:element name="container" type="lib:ContainerType"/>
+
+</xsd:schema>

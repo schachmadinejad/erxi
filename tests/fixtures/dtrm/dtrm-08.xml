@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 08: DTRM auf Attributen (decimal-Attr als String) -->
+<!-- DTRM: xsd:decimal → exi:string -->
+<root xmlns="http://example.org/dtrm" decimalAttr="99.99" intAttr="7">
+  <decimalVal>1.23</decimalVal>
+  <integerVal>456</integerVal>
+  <booleanVal>false</booleanVal>
+  <doubleVal>7.89</doubleVal>
+  <stringVal>attr-test</stringVal>
+  <dateVal>2025-12-25</dateVal>
+  <myDecimalVal>0.01</myDecimalVal>
+  <myIntegerVal>999</myIntegerVal>
+  <myStringVal>end</myStringVal>
+</root>

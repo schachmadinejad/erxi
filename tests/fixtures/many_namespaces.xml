@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root xmlns:a="http://a.example.org" xmlns:b="http://b.example.org" xmlns:c="http://c.example.org">
+  <a:item>A1</a:item>
+  <b:item>B1</b:item>
+  <c:item>C1</c:item>
+  <a:item>A2</a:item>
+  <b:item>B2</b:item>
+</root>

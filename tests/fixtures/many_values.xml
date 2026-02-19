@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test für Spec 9.3: >100 Values triggert separate Compressed Streams -->
+<root>
+  <!-- 105 item-Elemente = 105 CH Values für Channel "item" -->
+  <item>v001</item><item>v002</item><item>v003</item><item>v004</item><item>v005</item>
+  <item>v006</item><item>v007</item><item>v008</item><item>v009</item><item>v010</item>
+  <item>v011</item><item>v012</item><item>v013</item><item>v014</item><item>v015</item>
+  <item>v016</item><item>v017</item><item>v018</item><item>v019</item><item>v020</item>
+  <item>v021</item><item>v022</item><item>v023</item><item>v024</item><item>v025</item>
+  <item>v026</item><item>v027</item><item>v028</item><item>v029</item><item>v030</item>
+  <item>v031</item><item>v032</item><item>v033</item><item>v034</item><item>v035</item>
+  <item>v036</item><item>v037</item><item>v038</item><item>v039</item><item>v040</item>
+  <item>v041</item><item>v042</item><item>v043</item><item>v044</item><item>v045</item>
+  <item>v046</item><item>v047</item><item>v048</item><item>v049</item><item>v050</item>
+  <item>v051</item><item>v052</item><item>v053</item><item>v054</item><item>v055</item>
+  <item>v056</item><item>v057</item><item>v058</item><item>v059</item><item>v060</item>
+  <item>v061</item><item>v062</item><item>v063</item><item>v064</item><item>v065</item>
+  <item>v066</item><item>v067</item><item>v068</item><item>v069</item><item>v070</item>
+  <item>v071</item><item>v072</item><item>v073</item><item>v074</item><item>v075</item>
+  <item>v076</item><item>v077</item><item>v078</item><item>v079</item><item>v080</item>
+  <item>v081</item><item>v082</item><item>v083</item><item>v084</item><item>v085</item>
+  <item>v086</item><item>v087</item><item>v088</item><item>v089</item><item>v090</item>
+  <item>v091</item><item>v092</item><item>v093</item><item>v094</item><item>v095</item>
+  <item>v096</item><item>v097</item><item>v098</item><item>v099</item><item>v100</item>
+  <item>v101</item><item>v102</item><item>v103</item><item>v104</item><item>v105</item>
+  <!-- 3 other-Elemente = 3 CH Values für Channel "other" (≤100) -->
+  <other>a</other>
+  <other>b</other>
+  <other>c</other>
+</root>

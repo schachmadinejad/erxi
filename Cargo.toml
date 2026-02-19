@@ -1,0 +1,43 @@
+[package]
+name = "erxi"
+version = "0.1.0"
+edition = "2024"
+description = "EXI 1.0 (W3C Second Edition) implementation in Rust"
+license = "PolyForm-Noncommercial-1.0.0"
+repository = "https://github.com/schachmadinejad/erxi"
+
+[[bin]]
+name = "erxi"
+path = "src/bin/erxi.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli", "cli-fast", "mmap"]
+cli = ["dep:clap"]
+cli-fast = ["fast-deflate", "fast-alloc"]
+fast-deflate = ["flate2/zlib-ng"]
+fast-alloc = ["dep:mimalloc"]
+mmap = ["dep:memmap2"]
+
+[dependencies]
+quick-xml = "0.39"
+base64 = "0.22"
+clap = { version = "4", features = ["derive"], optional = true }
+flate2 = "1"
+indexmap = "2"
+memchr = "2"
+ahash = "0.8"
+roxmltree = "0.20"
+mimalloc = { version = "0.1", optional = true }
+memmap2 = { version = "0.9", optional = true }
+hashbrown = "0.16.1"
+libc = "0.2"
+log = "0.4"
+
+[profile.release]
+debug = 0
+strip = "symbols"
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    elementFormDefault="qualified">
+
+  <xs:simpleType name="StatusType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="OK"/>
+      <xs:enumeration value="WARN"/>
+      <xs:enumeration value="FAIL"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TierType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="A"/>
+      <xs:enumeration value="B"/>
+      <xs:enumeration value="C"/>
+      <xs:enumeration value="D"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="RegionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="EU"/>
+      <xs:enumeration value="NA"/>
+      <xs:enumeration value="APAC"/>
+      <xs:enumeration value="LATAM"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="CurrencyType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="EUR"/>
+      <xs:enumeration value="USD"/>
+      <xs:enumeration value="JPY"/>
+      <xs:enumeration value="GBP"/>
+      <xs:enumeration value="CHF"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="AUTO"/>
+      <xs:enumeration value="MANUAL"/>
+      <xs:enumeration value="SCHEDULED"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="CategoryType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="SENSOR"/>
+      <xs:enumeration value="ACTUATOR"/>
+      <xs:enumeration value="GATEWAY"/>
+      <xs:enumeration value="EDGE"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="records">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="record" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="ts" type="xs:long"/>
+              <xs:element name="deviceId" type="xs:string"/>
+              <xs:element name="zone" type="xs:unsignedShort"/>
+              <xs:element name="status" type="StatusType"/>
+              <xs:element name="tier" type="TierType"/>
+              <xs:element name="region" type="RegionType"/>
+              <xs:element name="currency" type="CurrencyType"/>
+              <xs:element name="mode" type="ModeType"/>
+              <xs:element name="category" type="CategoryType"/>
+              <xs:element name="tempC" type="xs:short"/>
+              <xs:element name="pressureKPa" type="xs:unsignedShort"/>
+              <xs:element name="humidityPct" type="xs:unsignedByte"/>
+              <xs:element name="voltageV" type="xs:decimal"/>
+              <xs:element name="currentA" type="xs:decimal"/>
+              <xs:element name="speedRpm" type="xs:decimal"/>
+              <xs:element name="ok" type="xs:boolean"/>
+            </xs:sequence>
+            <xs:attribute name="id" type="xs:unsignedInt" use="required"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

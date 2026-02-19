@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 03: boolean→exi:string -->
+<!-- DTRM: xsd:boolean → exi:string -->
+<root xmlns="http://example.org/dtrm">
+  <decimalVal>1</decimalVal>
+  <integerVal>0</integerVal>
+  <booleanVal>true</booleanVal>
+  <doubleVal>0</doubleVal>
+  <stringVal>flag</stringVal>
+  <dateVal>1999-12-31</dateVal>
+  <myDecimalVal>2.5</myDecimalVal>
+  <myIntegerVal>7</myIntegerVal>
+  <myStringVal>xyz</myStringVal>
+</root>

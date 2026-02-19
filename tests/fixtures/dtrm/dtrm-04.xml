@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 04: decimal→exi:integer (Typwechsel) -->
+<!-- DTRM: xsd:decimal → exi:integer -->
+<root xmlns="http://example.org/dtrm">
+  <decimalVal>42</decimalVal>
+  <integerVal>100</integerVal>
+  <booleanVal>false</booleanVal>
+  <doubleVal>3.14</doubleVal>
+  <stringVal>int-test</stringVal>
+  <dateVal>2026-06-15</dateVal>
+  <myDecimalVal>7</myDecimalVal>
+  <myIntegerVal>200</myIntegerVal>
+  <myStringVal>end</myStringVal>
+</root>

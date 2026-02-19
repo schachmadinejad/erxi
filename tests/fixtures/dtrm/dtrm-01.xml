@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DTRM Test 01: decimal→exi:string (Basisfall) -->
+<!-- DTRM: xsd:decimal → exi:string -->
+<root xmlns="http://example.org/dtrm" decimalAttr="3.14" intAttr="42">
+  <decimalVal>123.456</decimalVal>
+  <integerVal>789</integerVal>
+  <booleanVal>true</booleanVal>
+  <doubleVal>2.718</doubleVal>
+  <stringVal>hello</stringVal>
+  <dateVal>2026-02-10</dateVal>
+  <myDecimalVal>99.99</myDecimalVal>
+  <myIntegerVal>100</myIntegerVal>
+  <myStringVal>world</myStringVal>
+</root>

@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<xsd:schema targetNamespace="urn:test"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+<xsd:import namespace="urn:nonexistent" schemaLocation="does_not_exist.xsd"/>
+
+<xsd:element name="test" type="xsd:string"/>
+
+</xsd:schema>

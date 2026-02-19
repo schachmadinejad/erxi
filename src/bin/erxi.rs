@@ -1,0 +1,766 @@
+//! erxi CLI — XML <-> EXI Konvertierung.
+
+#[cfg(feature = "fast-alloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+use clap::{Args, Parser, Subcommand};
+use erxi::encoder::EncoderConfig;
+use erxi::options::{Alignment, DatatypeRepresentationMapping, ExiOptions, Preserve, SchemaId};
+use erxi::xml_serializer::events_to_xml_iter_fallible;
+use erxi::xsd::parse_xsd_with_imports;
+use erxi::Error;
+use erxi::ExiEvent;
+use erxi::QName;
+use std::io::{IsTerminal, Read, Write};
+use std::path::Path;
+use std::process;
+
+const ENCODE_FLUSH_BYTES: usize = 8 * 1024 * 1024;
+
+fn encode_event_with_flush(
+    encoder: &mut erxi::encoder::Encoder,
+    writer: &mut Option<std::io::BufWriter<std::fs::File>>,
+    event: ExiEvent,
+) -> Result<(), erxi::Error> {
+    encoder.encode_event(&event)?;
+    if let Some(writer) = writer.as_mut() {
+        if encoder.buf_len() >= ENCODE_FLUSH_BYTES {
+            encoder.flush_to(writer)?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Parser)]
+#[command(name = "erxi", about = "XML <-> EXI Konvertierung")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// XML nach EXI encodieren
+    Encode(EncodeArgs),
+    /// EXI nach XML decodieren
+    Decode(DecodeArgs),
+}
+
+#[derive(Args)]
+struct EncodeArgs {
+    #[command(flatten)]
+    common: CommonArgs,
+
+    /// Options im EXI-Header schreiben (Default: automatisch wenn nicht-default Optionen)
+    #[arg(long)]
+    include_options: bool,
+
+    /// Options NICHT im EXI-Header schreiben (ueberschreibt --include-options und Auto-Detect)
+    #[arg(long)]
+    no_include_options: bool,
+
+    /// "$EXI" Cookie schreiben
+    #[arg(long)]
+    include_cookie: bool,
+}
+
+#[derive(Args)]
+struct DecodeArgs {
+    #[command(flatten)]
+    common: CommonArgs,
+}
+
+#[derive(Args)]
+struct CommonArgs {
+    /// Eingabedatei (- fuer stdin)
+    #[arg(short, long)]
+    input: String,
+
+    /// Ausgabedatei (encode: erforderlich, decode: optional/stdout)
+    #[arg(short, long)]
+    output: Option<String>,
+
+    /// Schema-Datei (.xsd)
+    #[arg(short, long)]
+    schema: Option<String>,
+
+    // -- Alignment (gegenseitig ausschliessend) --
+    /// Byte-Alignment
+    #[arg(long, conflicts_with_all = ["pre_compression", "compression"])]
+    byte_aligned: bool,
+
+    /// Pre-Compression Alignment
+    #[arg(long, conflicts_with_all = ["byte_aligned", "compression"])]
+    pre_compression: bool,
+
+    /// DEFLATE Compression
+    #[arg(long, conflicts_with_all = ["byte_aligned", "pre_compression"])]
+    compression: bool,
+
+    // -- Modus --
+    /// Strikter Modus
+    #[arg(long)]
+    strict: bool,
+
+    /// Fragment-Modus
+    #[arg(long)]
+    fragment: bool,
+
+    // -- Fidelity (preserve) --
+    /// CM-Events erhalten
+    #[arg(long)]
+    preserve_comments: bool,
+
+    /// PI-Events erhalten
+    #[arg(long)]
+    preserve_pis: bool,
+
+    /// DT/ER-Events erhalten
+    #[arg(long)]
+    preserve_dtd: bool,
+
+    /// NS-Prefixes erhalten
+    #[arg(long)]
+    preserve_prefixes: bool,
+
+    /// Lexikalische Werte erhalten
+    #[arg(long)]
+    preserve_lexical: bool,
+
+    /// Insignifikanten Whitespace beibehalten (Default: wird gestrippt)
+    #[arg(long)]
+    preserve_whitespace: bool,
+
+    /// Self-Contained Fragmente aktivieren (Spec 8.5.4.4.1)
+    #[arg(long)]
+    self_contained: bool,
+
+    /// Self-Contained nur fuer bestimmte Elemente (URI LOCAL), wiederholbar
+    #[arg(long, value_names = ["URI", "LOCAL"], num_args = 2, action = clap::ArgAction::Append)]
+    self_contained_qname: Vec<String>,
+
+    /// Schema-ID im EXI-Header (Spec 5.4)
+    #[arg(long, conflicts_with_all = ["schema_id_none", "schema_id_builtin"])]
+    schema_id: Option<String>,
+
+    /// Schema-ID = None (xsi:nil=true)
+    #[arg(long, conflicts_with_all = ["schema_id", "schema_id_builtin"])]
+    schema_id_none: bool,
+
+    /// Schema-ID = BuiltinOnly (leerer String)
+    #[arg(long, conflicts_with_all = ["schema_id", "schema_id_none"])]
+    schema_id_builtin: bool,
+
+    /// Datatype Representation Map Entry (TYPE_URI TYPE_LOCAL REP_URI REP_LOCAL), wiederholbar
+    #[arg(long, value_names = ["TYPE_URI", "TYPE_LOCAL", "REP_URI", "REP_LOCAL"], num_args = 4, action = clap::ArgAction::Append)]
+    dtrm: Vec<String>,
+
+    // -- Erweitert --
+    /// Parallele DEFLATE-Kompression (erfordert --compression)
+    #[arg(long, requires = "compression")]
+    parallel_deflate: bool,
+
+    /// Compression Block Size
+    #[arg(long, default_value_t = 1_000_000)]
+    block_size: u32,
+
+    /// String Table max. Wert-Laenge
+    #[arg(long)]
+    value_max_length: Option<u32>,
+
+    /// String Table Partitions-Kapazitaet
+    #[arg(long)]
+    value_capacity: Option<u32>,
+
+    /// RAM-Monitoring deaktivieren
+    #[arg(long)]
+    no_memory_monitor: bool,
+}
+
+impl CommonArgs {
+    fn to_options(&self) -> ExiOptions {
+        let alignment = if self.byte_aligned {
+            Alignment::ByteAlignment
+        } else if self.pre_compression {
+            Alignment::PreCompression
+        } else {
+            Alignment::BitPacked
+        };
+
+        let mut opts = ExiOptions::default();
+        opts.set_alignment(alignment);
+        opts.set_compression(self.compression);
+        opts.set_strict(self.strict);
+        opts.set_fragment(self.fragment);
+        opts.set_preserve(Preserve {
+            comments: self.preserve_comments,
+            pis: self.preserve_pis,
+            dtd: self.preserve_dtd,
+            prefixes: self.preserve_prefixes,
+            lexical_values: self.preserve_lexical,
+            whitespace: self.preserve_whitespace,
+        });
+        if self.self_contained || !self.self_contained_qname.is_empty() {
+            opts.set_self_contained(true);
+            if !self.self_contained_qname.is_empty() {
+                let mut qnames = Vec::with_capacity(self.self_contained_qname.len() / 2);
+                for pair in self.self_contained_qname.chunks(2) {
+                    qnames.push(QName::new(pair[0].as_str(), pair[1].as_str()));
+                }
+                opts.set_self_contained_qnames(qnames);
+            }
+        }
+        if self.schema_id_none {
+            opts.set_schema_id(Some(SchemaId::None));
+        } else if self.schema_id_builtin {
+            opts.set_schema_id(Some(SchemaId::BuiltinOnly));
+        } else if let Some(ref id) = self.schema_id {
+            opts.set_schema_id(Some(SchemaId::Id(id.clone())));
+        }
+        if !self.dtrm.is_empty() {
+            let mut map = Vec::with_capacity(self.dtrm.len() / 4);
+            for chunk in self.dtrm.chunks(4) {
+                map.push(DatatypeRepresentationMapping {
+                    type_qname: QName::new(chunk[0].as_str(), chunk[1].as_str()),
+                    representation_qname: QName::new(chunk[2].as_str(), chunk[3].as_str()),
+                });
+            }
+            opts.set_datatype_representation_map(map);
+        }
+        opts.set_block_size(self.block_size);
+        opts.set_value_max_length(self.value_max_length);
+        opts.set_value_partition_capacity(self.value_capacity);
+        opts
+    }
+}
+
+fn read_input(path: &str) -> Result<Vec<u8>, String> {
+    if path == "-" {
+        if std::io::stdin().is_terminal() {
+            eprintln!("Lese von stdin (Ctrl+D zum Beenden)...");
+        }
+        let mut buf = Vec::new();
+        std::io::stdin()
+            .read_to_end(&mut buf)
+            .map_err(|e| format!("Lesefehler (stdin): {e}"))?;
+        Ok(buf)
+    } else {
+        std::fs::read(path).map_err(|e| format!("Lesefehler '{}': {e}", path))
+    }
+}
+
+/// Header-bezogene Fehler, bei denen ein Fallback auf CLI-Options sinnvoll ist.
+fn is_header_error(e: &Error) -> bool {
+    matches!(
+        e,
+        Error::MalformedHeader | Error::InvalidDistinguishingBits(_) | Error::UnsupportedVersion
+    )
+}
+
+/// Besitzer der Decode-Eingabedaten. Haelt entweder eine Mmap oder einen Vec<u8> am Leben,
+/// damit der zurueckgegebene &[u8] Slice gueltig bleibt.
+enum DecodeInput {
+    Buf(Vec<u8>),
+    #[cfg(feature = "mmap")]
+    Mmap(memmap2::Mmap),
+}
+
+impl std::ops::Deref for DecodeInput {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        match self {
+            DecodeInput::Buf(v) => v,
+            #[cfg(feature = "mmap")]
+            DecodeInput::Mmap(m) => m,
+        }
+    }
+}
+
+/// Laedt die Eingabedaten fuer den Decode-Pfad.
+/// Datei-Input wird Memory-Mapped (nur benoetigte Seiten im RAM).
+/// stdin wird per read_to_end() gelesen (unvermeidbar, da kein fd fuer mmap).
+fn load_decode_input(path: &str) -> Result<DecodeInput, String> {
+    if path != "-" {
+        #[cfg(feature = "mmap")]
+        {
+            let file = std::fs::File::open(path)
+                .map_err(|e| format!("Lesefehler '{}': {e}", path))?;
+            let mmap = unsafe { memmap2::Mmap::map(&file) }
+                .map_err(|e| format!("Mmap-Fehler '{}': {e}", path))?;
+            return Ok(DecodeInput::Mmap(mmap));
+        }
+        #[cfg(not(feature = "mmap"))]
+        {
+            let buf = std::fs::read(path)
+                .map_err(|e| format!("Lesefehler '{}': {e}", path))?;
+            return Ok(DecodeInput::Buf(buf));
+        }
+    }
+    let buf = read_input("-")?;
+    Ok(DecodeInput::Buf(buf))
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    if let Err(e) = run(cli) {
+        eprintln!("Fehler: {e}");
+        process::exit(1);
+    }
+}
+
+fn run(cli: Cli) -> Result<(), String> {
+    match cli.command {
+        Command::Encode(args) => run_encode(args),
+        Command::Decode(args) => run_decode(args),
+    }
+}
+
+/// Prüft ob Streaming-Modus möglich ist:
+/// - Kein PreCompression/Compression
+/// - Input ist Datei (nicht stdin), da bei DTD-Fallback die Datei erneut gelesen
+///   werden muss (Batch-Pfad)
+fn can_stream_file(args: &EncodeArgs, opts: &ExiOptions) -> bool {
+    !opts.compression()
+        && !matches!(opts.alignment(), Alignment::PreCompression)
+        && args.common.input != "-"
+}
+
+fn can_stream_stdin(opts: &ExiOptions) -> bool {
+    !opts.compression() && !matches!(opts.alignment(), Alignment::PreCompression)
+}
+
+fn run_encode(args: EncodeArgs) -> Result<(), String> {
+    let opts = args.common.to_options();
+
+    opts.validate()
+        .map_err(|e| format!("Ungueltige Optionen: {e}"))?;
+
+    let output_path = args
+        .common
+        .output
+        .as_deref()
+        .ok_or("encode erfordert -o <datei>")?;
+
+    let schema = args.common.schema.as_ref()
+        .map(|p| parse_xsd_with_imports(Path::new(p)))
+        .transpose()
+        .map_err(|e| format!("Schema-Parse-Fehler: {e}"))?;
+    validate_schema_option_requirements(&opts, args.common.schema.is_some())?;
+
+    // Auto-Detect: Options in Header schreiben wenn nicht-default Optionen aktiv.
+    // --no-include-options ueberschreibt alles, --include-options forciert.
+    let include_options = if args.no_include_options {
+        false
+    } else if args.include_options {
+        true
+    } else {
+        opts.compression()
+            || matches!(opts.alignment(), Alignment::PreCompression | Alignment::ByteAlignment)
+            || opts.strict()
+            || opts.fragment()
+            || opts.preserve().has_header_relevant_flags()
+            || opts.block_size() != 1_000_000
+            || opts.value_max_length().is_some()
+            || opts.value_partition_capacity().is_some()
+            || opts.self_contained()
+            || opts.schema_id().is_some()
+            || !opts.datatype_representation_map().is_empty()
+    };
+
+    let config = EncoderConfig {
+        include_options,
+        include_cookie: args.include_cookie,
+    };
+
+    // Streaming von stdin (keine DTD-Entity-Aufloesung wie beim alten stdin-Pfad)
+    if args.common.input == "-" && can_stream_stdin(&opts) {
+        let tmp_path = format!("{output_path}.tmp");
+        let stdin = std::io::stdin();
+        let result = erxi::streaming::encode_xml_stream_with_config_and_dtd_guard(
+            stdin.lock(),
+            std::io::BufWriter::new(
+                std::fs::File::create(&tmp_path)
+                    .map_err(|e| format!("Schreibfehler: {e}"))?,
+            ),
+            &opts,
+            schema.as_ref(),
+            config.clone(),
+            None,
+            create_memory_monitor(&args.common),
+            false,
+        );
+        match result {
+            Ok(()) => {
+                std::fs::rename(&tmp_path, output_path)
+                    .map_err(|e| format!("Rename-Fehler: {e}"))?;
+                return Ok(());
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(format!("Encode-Fehler: {e}"));
+            }
+        }
+    }
+
+    // Streaming-Pfad fuer grosse Dateien (begrenzter Speicher)
+    if can_stream_file(&args, &opts) {
+        let tmp_path = format!("{output_path}.tmp");
+        let input_path = Path::new(&args.common.input);
+        let result = erxi::streaming::encode_xml_stream_with_config(
+            std::fs::File::open(input_path)
+                .map_err(|e| format!("Lesefehler '{}': {e}", args.common.input))?,
+            std::io::BufWriter::new(
+                std::fs::File::create(&tmp_path)
+                    .map_err(|e| format!("Schreibfehler: {e}"))?,
+            ),
+            &opts,
+            schema.as_ref(),
+            config.clone(),
+            input_path.parent(),
+            create_memory_monitor(&args.common),
+        );
+        match result {
+            Ok(()) => {
+                std::fs::rename(&tmp_path, output_path)
+                    .map_err(|e| format!("Rename-Fehler: {e}"))?;
+                return Ok(());
+            }
+            Err(erxi::Error::DtdRequiresBatchApi) => {
+                eprintln!("Hinweis: DTD-Entities erkannt, wechsle auf Batch-Modus...");
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(format!("Encode-Fehler: {e}"));
+            }
+        }
+        let _ = std::fs::remove_file(&tmp_path);
+    }
+
+    // Batch-Pfad: Callback-basiert (kein Events Vec im Speicher)
+
+    let mut encoder = create_configured_encoder(
+        &args.common, opts.clone(), config.clone(), schema.as_ref(),
+    )?;
+
+    let wants_stream_output = !opts.compression()
+        && !matches!(opts.alignment(), Alignment::PreCompression);
+    let tmp_path = if wants_stream_output {
+        Some(format!("{output_path}.tmp"))
+    } else {
+        None
+    };
+    let mut output_writer = if let Some(ref path) = tmp_path {
+        Some(std::io::BufWriter::new(
+            std::fs::File::create(path).map_err(|e| format!("Schreibfehler: {e}"))?,
+        ))
+    } else {
+        None
+    };
+
+    if args.common.input != "-" {
+        let result = erxi::xml::emit_xml_events_from_file_cb(
+            Path::new(&args.common.input),
+            &opts,
+            |event| encode_event_with_flush(&mut encoder, &mut output_writer, event),
+        );
+        match result {
+            Ok(()) => {}
+            Err(erxi::Error::DtdRequiresBatchApi) => {
+                eprintln!("Hinweis: DTD-Entities erkannt, wechsle auf Batch-Modus...");
+                if let Some(path) = tmp_path.as_deref() {
+                    output_writer.take();
+                    let _ = std::fs::remove_file(path);
+                    output_writer = Some(std::io::BufWriter::new(
+                        std::fs::File::create(path)
+                            .map_err(|e| format!("Schreibfehler: {e}"))?,
+                    ));
+                }
+                // Neuen Encoder — der alte hat bereits inkonsistenten State
+                encoder = create_configured_encoder(
+                    &args.common, opts.clone(), config, schema.as_ref(),
+                )?;
+                erxi::xml::emit_xml_events_from_file_batch_cb(
+                    Path::new(&args.common.input),
+                    &opts,
+                    |event| encode_event_with_flush(&mut encoder, &mut output_writer, event),
+                ).map_err(|e| format!("Encode-Fehler: {e}"))?;
+            }
+            Err(e) => return Err(format!("Encode-Fehler: {e}")),
+        }
+    } else {
+        let data = read_input("-")?;
+        let xml = String::from_utf8(data).map_err(|e| format!("UTF-8-Fehler: {e}"))?;
+        erxi::xml::emit_xml_events_from_str_cb(
+            &xml,
+            &opts,
+            |event| encode_event_with_flush(&mut encoder, &mut output_writer, event),
+        ).map_err(|e| format!("Encode-Fehler: {e}"))?;
+    }
+
+    if opts.compression() || matches!(opts.alignment(), Alignment::PreCompression) {
+        // Compression/PreCompression erfordern vollständiges Buffering (Spec 9)
+        let bytes = encoder.finish().map_err(|e| format!("Encode-Fehler: {e}"))?;
+        std::fs::write(output_path, bytes).map_err(|e| format!("Schreibfehler: {e}"))?;
+    } else {
+        // BitPacked/ByteAlignment: direkt in Datei schreiben (kein Vec<u8> im RAM)
+        let mut writer = output_writer
+            .take()
+            .ok_or("interner Fehler: Output-Writer fehlt")?;
+        encoder.finish_to(&mut writer)
+            .map_err(|e| format!("Encode-Fehler: {e}"))?;
+        writer.flush().map_err(|e| format!("Schreibfehler: {e}"))?;
+        if let Some(path) = tmp_path.as_deref() {
+            std::fs::rename(path, output_path)
+                .map_err(|e| format!("Rename-Fehler: {e}"))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Erstellt einen Decode-Iterator (Schema oder Schema-less, mit Header-Fallback).
+fn create_decode_iter<'a>(
+    data: &'a [u8],
+    opts: ExiOptions,
+    schema: Option<&erxi::SchemaInfo>,
+) -> std::result::Result<(erxi::DecodeIter<'a>, ExiOptions), String> {
+    if let Some(schema) = schema {
+        erxi::decode_iter_with_schema(data, opts, schema)
+            .map_err(|e| format!("Decode-Fehler: {e}"))
+    } else {
+        match erxi::decode_iter_with_options(data, opts.clone()) {
+            Ok(result) => Ok(result),
+            Err(e) if is_header_error(&e) => {
+                eprintln!("Hinweis: Header-Decode fehlgeschlagen ({e}), versuche mit Default-Optionen...");
+                erxi::decode_iter_with_options(data, ExiOptions::default())
+                    .map_err(|e2| format!("Decode-Fehler: {e2}"))
+            }
+            Err(e) => Err(format!("Decode-Fehler: {e}")),
+        }
+    }
+}
+
+/// Erstellt einen MemoryMonitor (falls nicht deaktiviert).
+fn create_memory_monitor(args: &CommonArgs) -> Option<erxi::MemoryMonitor> {
+    if args.no_memory_monitor {
+        return None;
+    }
+    erxi::MemoryMonitor::new()
+}
+
+/// Erstellt einen Encoder mit optionalem Schema.
+fn create_encoder(
+    opts: ExiOptions,
+    config: EncoderConfig,
+    schema: Option<&erxi::SchemaInfo>,
+) -> std::result::Result<erxi::encoder::Encoder, String> {
+    if let Some(schema) = schema {
+        erxi::encoder::Encoder::with_schema(opts, config, schema.clone())
+    } else {
+        erxi::encoder::Encoder::new(opts, config)
+    }.map_err(|e| format!("Encode-Fehler: {e}"))
+}
+
+/// Erstellt einen vollstaendig konfigurierten Encoder (Schema, Parallel-DEFLATE, MemoryMonitor).
+fn create_configured_encoder(
+    args: &CommonArgs,
+    opts: ExiOptions,
+    config: EncoderConfig,
+    schema: Option<&erxi::SchemaInfo>,
+) -> std::result::Result<erxi::encoder::Encoder, String> {
+    let mut encoder = create_encoder(opts, config, schema)?;
+    encoder.set_parallel_deflate(args.parallel_deflate);
+    if let Some(monitor) = create_memory_monitor(args) {
+        encoder.set_memory_monitor(monitor);
+    }
+    Ok(encoder)
+}
+
+fn run_decode(args: DecodeArgs) -> Result<(), String> {
+    let opts = args.common.to_options();
+
+    opts.validate()
+        .map_err(|e| format!("Ungueltige Optionen: {e}"))?;
+
+    let schema = args.common.schema.as_ref()
+        .map(|p| parse_xsd_with_imports(Path::new(p)))
+        .transpose()
+        .map_err(|e| format!("Schema-Parse-Fehler: {e}"))?;
+    validate_schema_option_requirements(&opts, args.common.schema.is_some())?;
+
+    let input = load_decode_input(&args.common.input)?;
+    let data: &[u8] = &input;
+
+    let (mut iter, _opts) = create_decode_iter(data, opts, schema.as_ref())?;
+    if let Some(monitor) = create_memory_monitor(&args.common) {
+        iter.set_memory_monitor(monitor);
+    }
+
+    if let Some(ref output_path) = args.common.output {
+        let tmp_path = format!("{output_path}.tmp");
+        let file = std::fs::File::create(&tmp_path)
+            .map_err(|e| format!("Schreibfehler: {e}"))?;
+        if let Err(e) = events_to_xml_iter_fallible(iter, std::io::BufWriter::new(file)) {
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(format!("Serialisierungs-Fehler: {e}"));
+        }
+        std::fs::rename(&tmp_path, output_path)
+            .map_err(|e| format!("Rename-Fehler: {e}"))?;
+    } else {
+        events_to_xml_iter_fallible(iter, std::io::BufWriter::new(std::io::stdout().lock()))
+            .map_err(|e| format!("Serialisierungs-Fehler: {e}"))?;
+    }
+
+    Ok(())
+}
+
+fn validate_schema_option_requirements(opts: &ExiOptions, has_schema: bool) -> Result<(), String> {
+    if !has_schema {
+        if matches!(opts.schema_id(), Some(SchemaId::Id(_))) {
+            return Err("schema-id erfordert --schema".into());
+        }
+        if !opts.datatype_representation_map().is_empty() {
+            return Err("dtrm erfordert --schema".into());
+        }
+    } else if matches!(
+        opts.schema_id(),
+        Some(SchemaId::None | SchemaId::BuiltinOnly)
+    ) {
+        return Err("schema-id none/builtin ist mit --schema nicht kompatibel".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse_cli(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).expect("CLI parse failed")
+    }
+
+    #[test]
+    fn schema_id_flags_conflict() {
+        let err = Cli::try_parse_from([
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi",
+            "--schema-id", "urn:test", "--schema-id-none",
+        ]);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn schema_id_builtin_flags_conflict() {
+        let err = Cli::try_parse_from([
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi",
+            "--schema-id-builtin", "--schema-id-none",
+        ]);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn to_options_maps_self_contained_qname() {
+        let cli = parse_cli(&[
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi",
+            "--self-contained-qname", "urn:a", "root",
+        ]);
+        let Command::Encode(args) = cli.command else {
+            panic!("expected encode command");
+        };
+        let opts = args.common.to_options();
+        assert!(opts.self_contained());
+        assert_eq!(opts.self_contained_qnames().len(), 1);
+        assert_eq!(&*opts.self_contained_qnames()[0].uri, "urn:a");
+        assert_eq!(&*opts.self_contained_qnames()[0].local_name, "root");
+    }
+
+    #[test]
+    fn to_options_maps_schema_id_and_dtrm() {
+        let cli = parse_cli(&[
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi",
+            "--schema-id", "urn:schema:v1",
+            "--dtrm", "http://www.w3.org/2001/XMLSchema", "decimal", "http://www.w3.org/2009/exi", "string",
+        ]);
+        let Command::Encode(args) = cli.command else {
+            panic!("expected encode command");
+        };
+        let opts = args.common.to_options();
+        assert!(matches!(opts.schema_id(), Some(SchemaId::Id(id)) if id == "urn:schema:v1"));
+        assert_eq!(opts.datatype_representation_map().len(), 1);
+        let entry = &opts.datatype_representation_map()[0];
+        assert_eq!(&*entry.type_qname.local_name, "decimal");
+        assert_eq!(&*entry.representation_qname.local_name, "string");
+    }
+
+    #[test]
+    fn to_options_maps_schema_id_builtin_and_limits() {
+        let cli = parse_cli(&[
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi",
+            "--schema-id-builtin",
+            "--value-max-length", "321",
+            "--value-capacity", "654",
+            "--block-size", "12345",
+        ]);
+        let Command::Encode(args) = cli.command else {
+            panic!("expected encode command");
+        };
+        let opts = args.common.to_options();
+        assert!(matches!(opts.schema_id(), Some(SchemaId::BuiltinOnly)));
+        assert_eq!(opts.value_max_length(), Some(321));
+        assert_eq!(opts.value_partition_capacity(), Some(654));
+        assert_eq!(opts.block_size(), 12_345);
+    }
+
+    #[test]
+    fn to_options_maps_preserve_lexical_and_whitespace() {
+        let cli = parse_cli(&[
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi",
+            "--preserve-lexical", "--preserve-whitespace",
+        ]);
+        let Command::Encode(args) = cli.command else {
+            panic!("expected encode command");
+        };
+        let opts = args.common.to_options();
+        assert!(opts.preserve().lexical_values);
+        assert!(opts.preserve().whitespace);
+    }
+
+    #[test]
+    fn run_encode_rejects_schema_id_without_schema() {
+        let cli = parse_cli(&[
+            "erxi", "encode", "-i", "in.xml", "-o", "out.exi", "--schema-id", "urn:schema:v1",
+        ]);
+        let Command::Encode(args) = cli.command else {
+            panic!("expected encode command");
+        };
+        let err = run_encode(args).expect_err("expected schema guard");
+        assert!(err.contains("schema-id erfordert --schema"));
+    }
+
+    #[test]
+    fn run_decode_rejects_dtrm_without_schema() {
+        let cli = parse_cli(&[
+            "erxi", "decode", "-i", "in.exi",
+            "--dtrm", "http://www.w3.org/2001/XMLSchema", "decimal", "http://www.w3.org/2009/exi", "string",
+        ]);
+        let Command::Decode(args) = cli.command else {
+            panic!("expected decode command");
+        };
+        let err = run_decode(args).expect_err("expected schema guard");
+        assert!(err.contains("dtrm erfordert --schema"));
+    }
+
+    #[test]
+    fn run_decode_rejects_schema_id_without_schema() {
+        let cli = parse_cli(&[
+            "erxi", "decode", "-i", "in.exi", "--schema-id", "urn:schema:v1",
+        ]);
+        let Command::Decode(args) = cli.command else {
+            panic!("expected decode command");
+        };
+        let err = run_decode(args).expect_err("expected schema guard");
+        assert!(err.contains("schema-id erfordert --schema"));
+    }
+}

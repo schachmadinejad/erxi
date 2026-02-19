@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:tns="http://example.org/dtrm"
+            targetNamespace="http://example.org/dtrm"
+            elementFormDefault="qualified">
+
+  <!-- Abgeleiteter Typ: myDecimal basiert auf xsd:decimal -->
+  <xsd:simpleType name="myDecimal">
+    <xsd:restriction base="xsd:decimal"/>
+  </xsd:simpleType>
+
+  <!-- Abgeleiteter Typ: myInteger basiert auf xsd:integer -->
+  <xsd:simpleType name="myInteger">
+    <xsd:restriction base="xsd:integer"/>
+  </xsd:simpleType>
+
+  <!-- Abgeleiteter Typ: myString basiert auf xsd:string -->
+  <xsd:simpleType name="myString">
+    <xsd:restriction base="xsd:string"/>
+  </xsd:simpleType>
+
+  <!-- Einfaches Root-Element mit diversen Typen -->
+  <xsd:element name="root" type="tns:RootType"/>
+
+  <xsd:complexType name="RootType">
+    <xsd:sequence>
+      <xsd:element name="decimalVal" type="xsd:decimal"/>
+      <xsd:element name="integerVal" type="xsd:integer"/>
+      <xsd:element name="booleanVal" type="xsd:boolean"/>
+      <xsd:element name="doubleVal" type="xsd:double"/>
+      <xsd:element name="stringVal" type="xsd:string"/>
+      <xsd:element name="dateVal" type="xsd:date"/>
+      <xsd:element name="myDecimalVal" type="tns:myDecimal"/>
+      <xsd:element name="myIntegerVal" type="tns:myInteger"/>
+      <xsd:element name="myStringVal" type="tns:myString"/>
+    </xsd:sequence>
+    <xsd:attribute name="decimalAttr" type="xsd:decimal"/>
+    <xsd:attribute name="intAttr" type="xsd:integer"/>
+  </xsd:complexType>
+
+  <!-- Element fuer Multiple-Entry-Tests -->
+  <xsd:element name="multi" type="tns:MultiType"/>
+
+  <xsd:complexType name="MultiType">
+    <xsd:sequence>
+      <xsd:element name="a" type="xsd:decimal"/>
+      <xsd:element name="b" type="xsd:integer"/>
+      <xsd:element name="c" type="xsd:boolean"/>
+      <xsd:element name="d" type="xsd:double"/>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- Element fuer Closest-Ancestor-Tests -->
+  <xsd:element name="ancestor" type="tns:AncestorType"/>
+
+  <xsd:complexType name="AncestorType">
+    <xsd:sequence>
+      <xsd:element name="derived" type="tns:myDecimal"/>
+      <xsd:element name="base" type="xsd:decimal"/>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <!-- Element fuer gemischte Typen -->
+  <xsd:element name="mixed" type="tns:MixedType"/>
+
+  <xsd:complexType name="MixedType">
+    <xsd:sequence>
+      <xsd:element name="mapped" type="xsd:decimal"/>
+      <xsd:element name="unmapped" type="xsd:boolean"/>
+      <xsd:element name="text" type="xsd:string"/>
+    </xsd:sequence>
+  </xsd:complexType>
+
+</xsd:schema>
