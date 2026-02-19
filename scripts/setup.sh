@@ -57,11 +57,13 @@ ensure_exificient_fat_jar() {
   done
 
   echo "Building Exificient fat JAR: $EXI_FAT_JAR"
-  python3 - <<'PY'
+  ROOT_DIR="$ROOT" python3 - <<'PY'
 import zipfile
 from pathlib import Path
+import os
 
-root = Path(__file__).resolve().parent.parent
+root_env = os.environ.get("ROOT_DIR")
+root = Path(root_env) if root_env else Path.cwd()
 jar_dir = root / "tests" / "fixtures" / "exificient"
 jar_paths = [
     jar_dir / "exificient-1.0.4.jar",
@@ -92,17 +94,31 @@ PY
   export EXIFICIENT_JAR="$EXI_FAT_JAR"
 }
 
-main() {
-  ensure_testsuite
-  ensure_exificient_fat_jar
+ensure_exifbatch_class() {
+  local class_file="$ROOT/tools/ExifBatch.class"
+  local java_file="$ROOT/tools/ExifBatch.java"
+  if [[ -f "$class_file" ]]; then
+    return
+  fi
 
-  cd "$ROOT"
+  if ! command -v javac >/dev/null 2>&1; then
+    echo "ERROR: javac not found; cannot compile ExifBatch" >&2
+    exit 1
+  fi
 
-  echo "Running cross/interop tests..."
-  cargo test --quiet --test coverage_matrix -- --nocapture
-  cargo test --quiet --test cli_cross_exificient -- --nocapture
-  cargo test --quiet --test exi4json_cross_exificient -- --nocapture
-  cargo test --quiet --test cross_rtt -- --nocapture
+  echo "Compiling ExifBatch.java"
+  javac -cp "$EXIFICIENT_JAR" "$java_file"
 }
 
-main "$@"
+ensure_testsuite
+ensure_exificient_fat_jar
+ensure_exifbatch_class
+
+if [[ "${1:-}" == "--export" ]]; then
+  mkdir -p "$ROOT/target"
+  cat > "$ROOT/target/cross_env.sh" <<ENV
+export EXI_TESTSUITE_DIR="$EXI_TESTSUITE_DIR"
+export EXIFICIENT_JAR="$EXIFICIENT_JAR"
+ENV
+  echo "Wrote $ROOT/target/cross_env.sh"
+fi

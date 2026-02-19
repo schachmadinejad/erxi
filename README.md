@@ -169,7 +169,7 @@ erxi implements the full EXI 1.0 Second Edition specification:
 | 8.5 | grammar.rs, proto_grammar.rs, xsd/ | Schema-informed grammars |
 | 9 | encoder/compression.rs, decoder/compression.rs | EXI compression |
 | 10 | tests/conformance.rs | Conformance |
-| Appendix B | tests/infoset_rtt.rs | Infoset mapping |
+| Appendix B | examples/full_cross_test.rs (infoset suite) | Infoset mapping |
 | Appendix C | options_codec.rs | Options header schema |
 | Appendix D | string_table.rs | Initial String Table entries |
 | Appendix E | rcs.rs | Restricted Character Sets |
@@ -182,23 +182,28 @@ Known deviations: [docs/interop-deviations.md](docs/interop-deviations.md)
 # Unit and integration tests
 cargo test
 
-# Regression test against cross-matrix expectations
-./scripts/run_cross_matrix_test.sh
+# Setup + full matrix + verify
+./scripts/complete.sh
 
-# Individual test suites
+# Setup only (exports EXI_TESTSUITE_DIR/EXIFICIENT_JAR)
+source ./scripts/setup.sh
+
+# Run full matrix (requires EXI_TESTSUITE_DIR/EXIFICIENT_JAR)
+./scripts/run.sh
+
+# Verify results against expectations
+./scripts/verify.sh
+
+# Individual suites
 cargo test --test conformance       # Spec 10 conformance
-cargo test --test w3c_interop       # W3C Test Suite
-cargo test --test cross_rtt         # Cross-RTT with Exificient fixtures
-cargo test --test infoset_rtt       # Infoset round-trip (Appendix B)
-cargo test --test dtrm_rtt          # Datatype Representation Mapping
+cargo test --test cli_e2e           # CLI end-to-end tests
+cargo test --test full_cross_matrix # Full cross matrix (via scripts/run.sh)
 ```
 
 ### Test Prerequisites
 
-- **W3C EXI Test Suite**: `EXI_TESTSUITE_DIR` must be set (or placed under
-  `/tmp/exi-testsuite/ttfms-interop-18122013`).
-- **Exificient (Java)**: set `EXIFICIENT_JAR` or place JARs under
-  `tests/fixtures/exificient/`. Java is required.
+- **W3C EXI Test Suite**: `EXI_TESTSUITE_DIR` must be set (setup script downloads by default).
+- **Exificient (Java)**: setup script builds a fat JAR and compiles `tools/ExifBatch.java`.
 
 ### Cross-Implementation Tests
 

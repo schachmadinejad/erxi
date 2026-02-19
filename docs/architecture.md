@@ -35,11 +35,11 @@ Layer 0  Bit I/O            bitstream.rs
 
 | File | Purpose |
 |------|---------|
-| `examples/full_cross_test.rs` | Cross-RTT fixture test (10 tests per fixture) |
-| `examples/dtrm_cross_test.rs` | DTRM (Datatype Representation Map) fixture test |
-| `scripts/run_cross_matrix_test.sh` | Regression test against expected results |
-| `scripts/run_full_cross_matrix.sh` | Raw cross-RTT matrix (data collection only) |
-| `scripts/run_dtrm_cross_test.sh` | DTRM cross-RTT tests |
+| `examples/full_cross_test.rs` | Unified cross-RTT/interop matrix (W3C + DTRM + EXI4JSON + infoset + coverage + CLI) |
+| `scripts/setup.sh` | Fetch prerequisites and set env vars |
+| `scripts/run.sh` | Run full cross matrix |
+| `scripts/verify.sh` | Compare results against expectations |
+| `scripts/complete.sh` | Setup + run + verify |
 | `tests/cross_matrix_expectations.tsv` | Expected test results (non-OK entries; see file) |
 
 ## Interop Architecture

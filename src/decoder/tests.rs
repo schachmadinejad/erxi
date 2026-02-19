@@ -1622,7 +1622,7 @@ use super::*;
 
     /// Decodiert Exificient sc-02 bytealigned Fixture (Spec 8.5.4.4.1).
     /// ByteAlignment, Schema-informed mit acceptance.xsd.
-    /// Hinweis: preserve.prefixes wird NICHT gesetzt — der w3c_interop-Test
+    /// Hinweis: preserve.prefixes wird NICHT gesetzt — die full cross matrix
     /// decodiert sc-02 ohne dieses Flag und es funktioniert. Die Prefix-Info
     /// geht verloren, aber der Event-Stream ist korrekt.
     #[test]

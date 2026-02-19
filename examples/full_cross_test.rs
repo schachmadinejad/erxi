@@ -1,27 +1,30 @@
-//! Vollständige Cross-RTT-Matrix: Alle 10 Test-Kombinationen für ein Fixture.
+//! Vollständige Cross-RTT-Matrix: W3C Fixtures + DTRM + EXI4JSON + infoset + coverage + CLI.
 //!
 //! Argumente: <suite> <fixture_basename> <alignment>
-//! - suite: `declared` oder `undeclared`
+//! - suite: `declared`, `undeclared`, `dtrm`, `exi4json`, `infoset`, `coverage`, `cli`
 //! - fixture_basename: z.B. `complexType-01`
 //! - alignment: `bitpacked`, `bytealigned`, `precompression`, `compression`, `strict`
 //!
 //! Ausgabe: TSV auf stdout (fixture\ttest_id\tresult\tdetail)
 
-use erxi::decoder::decode_with_schema;
-use erxi::encoder::encode_with_schema;
-use erxi::event::ExiEvent;
-use erxi::options::{Alignment, DatatypeRepresentationMapping, ExiOptions};
+use erxi::decoder::{decode, decode_with_options, decode_with_schema};
+use erxi::encoder::{encode, encode_with_config, encode_with_schema, encode_with_schema_and_config, EncoderConfig};
+use erxi::event::{AtContent, ChContent, CmContent, DtContent, ErContent, ExiEvent, NsContent, PiContent};
+use erxi::options::{Alignment, DatatypeRepresentationMapping, ExiOptions, Preserve, SchemaId};
 use erxi::qname::QName;
 use erxi::schema::SchemaInfo;
-use erxi::xml::parse_xml_events_with_options;
+use erxi::xml::{parse_xml_events_from_str, parse_xml_events_with_options};
 use erxi::xml_serializer::events_to_xml;
 use erxi::xsd::parse_xsd_with_imports;
+use roxmltree;
+use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, Output, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // ============================================================================
 // Konstanten
@@ -286,7 +289,11 @@ fn load_schema(xml_basename: &str, suite: &str) -> Result<&'static SchemaInfo, S
 // ============================================================================
 
 fn options_to_exificient_args(opts: &ExiOptions, schema_path: &str) -> Vec<String> {
-    let mut args = vec!["-schema".to_string(), schema_path.to_string()];
+    let mut args = Vec::new();
+    if !schema_path.is_empty() {
+        args.push("-schema".to_string());
+        args.push(schema_path.to_string());
+    }
 
     match opts.alignment() {
         Alignment::ByteAlignment => args.push("-bytePacked".to_string()),
@@ -409,6 +416,848 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
+// ============================================================================
+// CLI-Interop Tests (erxi CLI <-> Exificient)
+// ============================================================================
+
+const CLI_FIXTURES: &[&str] = &["no-include-options", "exif-to-erxi"];
+const CLI_TEST_IDS: &[&str] = &["cli_erxi_to_exif", "cli_exif_to_erxi"];
+
+fn erxi_bin() -> PathBuf {
+    if let Ok(bin) = std::env::var("ERXI_BIN") {
+        return PathBuf::from(bin);
+    }
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let debug = root.join("target/debug/erxi");
+    if debug.exists() {
+        return debug;
+    }
+    let release = root.join("target/release/erxi");
+    if release.exists() {
+        return release;
+    }
+    PathBuf::from("erxi")
+}
+
+fn run_erxi(args: &[&str]) -> Result<Output, String> {
+    Command::new(erxi_bin())
+        .args(args)
+        .output()
+        .map_err(|e| format!("run erxi: {e}"))
+}
+
+fn cli_temp_dir(tag: &str) -> PathBuf {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock before epoch")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("erxi-cli-cross-{tag}-{}-{ts}", std::process::id()));
+    fs::create_dir_all(&dir).expect("create temp dir");
+    dir
+}
+
+fn assert_infoset_eq(expected_xml: &str, actual_xml: &str) -> Result<(), String> {
+    let opts = ExiOptions::default();
+    let expected = parse_xml_events_from_str(expected_xml, &opts).map_err(|e| format!("parse expected: {e}"))?;
+    let actual = parse_xml_events_from_str(actual_xml, &opts).map_err(|e| format!("parse actual: {e}"))?;
+    if expected == actual {
+        Ok(())
+    } else {
+        Err("infoset mismatch".to_string())
+    }
+}
+
+fn run_cli_tests(basename: &str, alignment: &str) {
+    let fixture_tag = format!("{}_{}", basename, alignment);
+    if !CLI_FIXTURES.contains(&basename) {
+        for test_id in CLI_TEST_IDS {
+            emit(&fixture_tag, test_id, "SKIP", "unknown-cli-fixture");
+        }
+        return;
+    }
+
+    match basename {
+        "no-include-options" => run_cli_no_include_options(&fixture_tag),
+        "exif-to-erxi" => run_cli_exif_to_erxi(&fixture_tag),
+        _ => {
+            for test_id in CLI_TEST_IDS {
+                emit(&fixture_tag, test_id, "SKIP", "unknown-cli-fixture");
+            }
+        }
+    }
+}
+
+fn run_cli_no_include_options(fixture_tag: &str) {
+    let dir = cli_temp_dir("no-include-to-exif");
+    let xml = "<root><item>abc</item><item>def</item></root>";
+    let xsd = r#"<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="root">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="item" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"#;
+    let xml_path = dir.join("in.xml");
+    let xsd_path = dir.join("schema.xsd");
+    let exi_path = dir.join("out.exi");
+    let exif_decoded = dir.join("exif-decoded.xml");
+    fs::write(&xml_path, xml).expect("write xml");
+    fs::write(&xsd_path, xsd).expect("write xsd");
+
+    let enc = match run_erxi(&[
+        "encode",
+        "-i",
+        xml_path.to_str().unwrap(),
+        "-o",
+        exi_path.to_str().unwrap(),
+        "--schema",
+        xsd_path.to_str().unwrap(),
+        "--byte-aligned",
+        "--no-include-options",
+    ]) {
+        Ok(out) => out,
+        Err(e) => {
+            emit(fixture_tag, "cli_erxi_to_exif", "FAIL", &truncate(&e, 80));
+            return;
+        }
+    };
+    if !enc.status.success() {
+        emit(
+            fixture_tag,
+            "cli_erxi_to_exif",
+            "FAIL",
+            &truncate(&String::from_utf8_lossy(&enc.stderr), 80),
+        );
+        return;
+    }
+
+    let mut opts = ExiOptions::default();
+    opts.set_alignment(Alignment::ByteAlignment);
+    if let Err(e) = exificient_decode(&exi_path, &opts, xsd_path.to_str().unwrap(), &exif_decoded) {
+        emit(fixture_tag, "cli_erxi_to_exif", "FAIL", &truncate(&e, 80));
+        return;
+    }
+
+    let xml_out = match fs::read_to_string(exif_decoded) {
+        Ok(s) => s,
+        Err(e) => {
+            emit(fixture_tag, "cli_erxi_to_exif", "FAIL", &truncate(&format!("read decoded: {e}"), 80));
+            return;
+        }
+    };
+
+    match assert_infoset_eq(xml, &xml_out) {
+        Ok(()) => emit(fixture_tag, "cli_erxi_to_exif", "OK", "infoset-match"),
+        Err(e) => emit(fixture_tag, "cli_erxi_to_exif", "FAIL", &truncate(&e, 80)),
+    }
+}
+
+fn run_cli_exif_to_erxi(fixture_tag: &str) {
+    let dir = cli_temp_dir("exif-to-erxi");
+    let xml = "<root><v>hello</v><v>world</v></root>";
+    let xsd = r#"<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="root">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="v" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"#;
+    let xml_path = dir.join("in.xml");
+    let xsd_path = dir.join("schema.xsd");
+    let exi_path = dir.join("exif.exi");
+    let erxi_decoded = dir.join("erxi-decoded.xml");
+    fs::write(&xml_path, xml).expect("write xml");
+    fs::write(&xsd_path, xsd).expect("write xsd");
+
+    let mut opts = ExiOptions::default();
+    opts.set_compression(true);
+    let mut p = *opts.preserve();
+    p.prefixes = true;
+    opts.set_preserve(p);
+
+    if let Err(e) = exificient_encode(&xml_path, &opts, xsd_path.to_str().unwrap(), &exi_path) {
+        emit(fixture_tag, "cli_exif_to_erxi", "FAIL", &truncate(&e, 80));
+        return;
+    }
+
+    let dec = match run_erxi(&[
+        "decode",
+        "-i",
+        exi_path.to_str().unwrap(),
+        "-o",
+        erxi_decoded.to_str().unwrap(),
+        "--schema",
+        xsd_path.to_str().unwrap(),
+        "--compression",
+        "--preserve-prefixes",
+    ]) {
+        Ok(out) => out,
+        Err(e) => {
+            emit(fixture_tag, "cli_exif_to_erxi", "FAIL", &truncate(&e, 80));
+            return;
+        }
+    };
+    if !dec.status.success() {
+        emit(
+            fixture_tag,
+            "cli_exif_to_erxi",
+            "FAIL",
+            &truncate(&String::from_utf8_lossy(&dec.stderr), 80),
+        );
+        return;
+    }
+
+    let xml_out = match fs::read_to_string(erxi_decoded) {
+        Ok(s) => s,
+        Err(e) => {
+            emit(fixture_tag, "cli_exif_to_erxi", "FAIL", &truncate(&format!("read decoded: {e}"), 80));
+            return;
+        }
+    };
+
+    match assert_infoset_eq(xml, &xml_out) {
+        Ok(()) => emit(fixture_tag, "cli_exif_to_erxi", "OK", "infoset-match"),
+        Err(e) => emit(fixture_tag, "cli_exif_to_erxi", "FAIL", &truncate(&e, 80)),
+    }
+}
+
+// ============================================================================
+// EXI4JSON Cross-Interop
+// ============================================================================
+
+const EXI4JSON_TEST_IDS: &[&str] = &["exi4json_erxi_to_exif", "exi4json_exif_to_erxi"];
+
+fn values_equivalent(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Null, Value::Null) => true,
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::String(x), Value::String(y)) => x == y,
+        (Value::Number(x), Value::Number(y)) => match (x.as_f64(), y.as_f64()) {
+            (Some(xf), Some(yf)) => (xf - yf).abs() <= f64::EPSILON * xf.abs().max(1.0),
+            _ => false,
+        },
+        (Value::Array(xs), Value::Array(ys)) => {
+            xs.len() == ys.len() && xs.iter().zip(ys.iter()).all(|(x, y)| values_equivalent(x, y))
+        }
+        (Value::Object(xm), Value::Object(ym)) => {
+            if xm.len() != ym.len() {
+                return false;
+            }
+            xm.iter().all(|(k, v)| ym.get(k).map_or(false, |v2| values_equivalent(v, v2)))
+        }
+        _ => false,
+    }
+}
+
+fn escape_key(key: &str) -> String {
+    const RESERVED: [&str; 7] = ["map", "array", "string", "number", "boolean", "null", "other"];
+    if RESERVED.contains(&key) {
+        return format!("_.{key}");
+    }
+    let mut out = String::new();
+    for (idx, ch) in key.chars().enumerate() {
+        if ch == '_' || !is_ncname_char(ch, idx == 0) {
+            out.push('_');
+            out.push_str(&(ch as u32).to_string());
+            out.push('.');
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn unescape_key(key: &str) -> String {
+    let mut input = key;
+    if let Some(rest) = key.strip_prefix("_.") {
+        input = rest;
+    }
+    let mut out = String::new();
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch != '_' {
+            out.push(ch);
+            continue;
+        }
+        let mut digits = String::new();
+        while let Some(&next) = chars.peek() {
+            if next == '.' {
+                break;
+            }
+            if !next.is_ascii_digit() {
+                return input.to_string();
+            }
+            digits.push(next);
+            chars.next();
+        }
+        if digits.is_empty() {
+            return input.to_string();
+        }
+        if chars.next() != Some('.') {
+            return input.to_string();
+        }
+        let code = match digits.parse::<u32>() {
+            Ok(v) => v,
+            Err(_) => return input.to_string(),
+        };
+        if let Some(decoded) = char::from_u32(code) {
+            out.push(decoded);
+        }
+    }
+    out
+}
+
+fn is_ncname_char(ch: char, is_first: bool) -> bool {
+    if !ch.is_ascii() {
+        return false;
+    }
+    if is_first {
+        ch.is_ascii_alphabetic() || ch == '_'
+    } else {
+        ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.'
+    }
+}
+
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('\"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn json_to_xml(value: &Value) -> String {
+    let mut out = String::new();
+    out.push_str("<j:");
+    build_xml(value, &mut out, true);
+    out
+}
+
+fn build_xml(value: &Value, out: &mut String, is_root: bool) {
+    match value {
+        Value::Object(map) => {
+            if is_root {
+                out.push_str("map xmlns:j=\"http://www.w3.org/2015/EXI/json\">");
+            } else {
+                out.push_str("map>");
+            }
+            for (k, v) in map {
+                let key = escape_key(k);
+                out.push_str("<j:");
+                out.push_str(&key);
+                out.push('>');
+                out.push_str("<j:");
+                build_xml(v, out, false);
+                out.push_str("</j:");
+                out.push_str(&key);
+                out.push('>');
+            }
+            out.push_str("</j:map>");
+        }
+        Value::Array(items) => {
+            out.push_str("array>");
+            for item in items {
+                out.push_str("<j:");
+                build_xml(item, out, false);
+            }
+            out.push_str("</j:array>");
+        }
+        Value::String(s) => {
+            out.push_str("string>");
+            out.push_str(&xml_escape(s));
+            out.push_str("</j:string>");
+        }
+        Value::Number(n) => {
+            out.push_str("number>");
+            out.push_str(&xml_escape(&n.to_string()));
+            out.push_str("</j:number>");
+        }
+        Value::Bool(b) => {
+            out.push_str("boolean>");
+            out.push_str(if *b { "true" } else { "false" });
+            out.push_str("</j:boolean>");
+        }
+        Value::Null => {
+            out.push_str("null/>");
+        }
+    }
+}
+
+fn xml_to_json(xml: &str) -> Result<Value, String> {
+    let doc = roxmltree::Document::parse(xml).map_err(|e| format!("parse xml: {e}"))?;
+    let root = doc.root_element();
+    Ok(element_to_value(&root))
+}
+
+fn element_to_value(elem: &roxmltree::Node) -> Value {
+    let local = elem.tag_name().name();
+    match local {
+        "map" => {
+            let mut obj = serde_json::Map::new();
+            for child in elem.children().filter(|n| n.is_element()) {
+                let key = unescape_key(child.tag_name().name());
+                let value_elem = child.children().find(|n| n.is_element()).expect("value element");
+                let value = element_to_value(&value_elem);
+                obj.insert(key, value);
+            }
+            Value::Object(obj)
+        }
+        "array" => {
+            let mut items = Vec::new();
+            for child in elem.children().filter(|n| n.is_element()) {
+                items.push(element_to_value(&child));
+            }
+            Value::Array(items)
+        }
+        "string" => Value::String(elem.text().unwrap_or("").to_string()),
+        "number" => {
+            let v: Value = serde_json::from_str(elem.text().unwrap_or("0")).expect("number");
+            v
+        }
+        "boolean" => Value::Bool(elem.text().unwrap_or("") == "true"),
+        "null" => Value::Null,
+        "other" => {
+            let child = elem.children().find(|n| n.is_element()).expect("other child");
+            let local = child.tag_name().name();
+            match local {
+                "integer" | "decimal" => {
+                    let v: Value = serde_json::from_str(child.text().unwrap_or("0")).expect("number");
+                    v
+                }
+                _ => Value::String(child.text().unwrap_or("").to_string()),
+            }
+        }
+        _ => Value::Null,
+    }
+}
+
+fn run_exi4json_tests(basename: &str, alignment: &str) {
+    let fixture_tag = format!("{}_{}", basename, alignment);
+    if alignment != "strict" {
+        for test_id in EXI4JSON_TEST_IDS {
+            emit(&fixture_tag, test_id, "SKIP", "strict-only");
+        }
+        return;
+    }
+    let json_path = Path::new("tests/fixtures/json").join(format!("{basename}.json"));
+    if !json_path.exists() {
+        for test_id in EXI4JSON_TEST_IDS {
+            emit(&fixture_tag, test_id, "SKIP", "json-missing");
+        }
+        return;
+    }
+
+    let json = match fs::read_to_string(&json_path) {
+        Ok(s) => s,
+        Err(e) => {
+            emit(&fixture_tag, "exi4json_erxi_to_exif", "FAIL", &truncate(&format!("read json: {e}"), 80));
+            emit(&fixture_tag, "exi4json_exif_to_erxi", "SKIP", "json-read-failed");
+            return;
+        }
+    };
+    let value: Value = match serde_json::from_str(&json) {
+        Ok(v) => v,
+        Err(e) => {
+            emit(&fixture_tag, "exi4json_erxi_to_exif", "FAIL", &truncate(&format!("parse json: {e}"), 80));
+            emit(&fixture_tag, "exi4json_exif_to_erxi", "SKIP", "json-parse-failed");
+            return;
+        }
+    };
+    let xml = json_to_xml(&value);
+    let schema_path = Path::new("src/exi4json.xsd");
+    let opts = ExiOptions::default().with_strict();
+
+    // erxi -> exificient decode
+    let dir = cli_temp_dir("exi4json-erxi-to-exif");
+    let exi_path = dir.join("out.exi");
+    let exif_decoded = dir.join("exif-decoded.xml");
+    match erxi::encode_json(&json) {
+        Ok(exi) => {
+            fs::write(&exi_path, exi).expect("write exi");
+            if let Err(e) = exificient_decode(&exi_path, &opts, schema_path.to_str().unwrap(), &exif_decoded) {
+                emit(&fixture_tag, "exi4json_erxi_to_exif", "FAIL", &truncate(&e, 80));
+            } else {
+                let xml_out = fs::read_to_string(exif_decoded).expect("read decoded");
+                match xml_to_json(&xml_out) {
+                    Ok(value_out) => {
+                        if values_equivalent(&value, &value_out) {
+                            emit(&fixture_tag, "exi4json_erxi_to_exif", "OK", "value-match");
+                        } else {
+                            emit(&fixture_tag, "exi4json_erxi_to_exif", "FAIL", "value-mismatch");
+                        }
+                    }
+                    Err(e) => {
+                        emit(&fixture_tag, "exi4json_erxi_to_exif", "FAIL", &truncate(&e, 80));
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            emit(&fixture_tag, "exi4json_erxi_to_exif", "FAIL", &truncate(&format!("encode_json: {e}"), 80));
+        }
+    }
+
+    // exificient -> erxi decode_json
+    let dir = cli_temp_dir("exi4json-exif-to-erxi");
+    let xml_path = dir.join("in.xml");
+    let exi_path = dir.join("exif.exi");
+    fs::write(&xml_path, xml).expect("write xml");
+    if let Err(e) = exificient_encode(&xml_path, &opts, schema_path.to_str().unwrap(), &exi_path) {
+        emit(&fixture_tag, "exi4json_exif_to_erxi", "FAIL", &truncate(&e, 80));
+    } else {
+        let exi = fs::read(&exi_path).expect("read exi");
+        match erxi::decode_json(&exi) {
+            Ok(json_out) => {
+                let value_out: Value = serde_json::from_str(&json_out).expect("parse output");
+                if values_equivalent(&value, &value_out) {
+                    emit(&fixture_tag, "exi4json_exif_to_erxi", "OK", "value-match");
+                } else {
+                    emit(&fixture_tag, "exi4json_exif_to_erxi", "FAIL", "value-mismatch");
+                }
+            }
+            Err(e) => {
+                emit(&fixture_tag, "exi4json_exif_to_erxi", "FAIL", &truncate(&format!("decode_json: {e}"), 80));
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Infoset Mapping (Spec Appendix B)
+// ============================================================================
+
+const INFOSET_TEST_ID: &str = "infoset_rtt";
+
+fn infoset_round_trip(xml: &str, opts: &ExiOptions) -> Result<Vec<ExiEvent>, String> {
+    let events = parse_xml_events_from_str(xml, opts).map_err(|e| format!("parse xml: {e}"))?;
+    let config = EncoderConfig { include_cookie: false, include_options: true };
+    let exi = encode_with_config(&events, opts, config).map_err(|e| format!("encode: {e}"))?;
+    let (decoded, _) = decode_with_options(&exi, opts.clone()).map_err(|e| format!("decode: {e}"))?;
+    Ok(decoded)
+}
+
+fn run_infoset_tests(basename: &str, alignment: &str) {
+    let fixture_tag = format!("{}_{}", basename, alignment);
+    let mut opts = ExiOptions::default();
+    match alignment {
+        "bytealigned" => opts.set_alignment(Alignment::ByteAlignment),
+        "precompression" => opts.set_alignment(Alignment::PreCompression),
+        "compression" => opts.set_compression(true),
+        "bitpacked" => {}
+        _ => {
+            emit(&fixture_tag, INFOSET_TEST_ID, "SKIP", "unsupported-alignment");
+            return;
+        }
+    }
+
+    let (xml, checks): (&str, fn(&[ExiEvent]) -> Result<(), String>) = match basename {
+        "b1_document" => ("<root/>", |events| {
+            if events.len() < 4 { return Err("too-few-events".to_string()); }
+            if !matches!(events.first(), Some(ExiEvent::StartDocument)) { return Err("missing-SD".to_string()); }
+            if !matches!(events.last(), Some(ExiEvent::EndDocument)) { return Err("missing-ED".to_string()); }
+            let has_root = events.iter().any(|e| matches!(e, ExiEvent::StartElement(q) if &*q.local_name == "root"));
+            if !has_root { return Err("missing-root-SE".to_string()); }
+            Ok(())
+        }),
+        "b2_element" => ("<root><a><b/></a><c/></root>", |events| {
+            if events.len() != 10 { return Err(format!("expected-10-events got={}", events.len())); }
+            Ok(())
+        }),
+        "b3_attribute" => (r#"<root a="1" b="2"><child x="y"/></root>"#, |events| {
+            let attrs: Vec<&AtContent> = events.iter().filter_map(|e| match e { ExiEvent::Attribute(at) => Some(at), _ => None }).collect();
+            if attrs.len() != 3 { return Err(format!("expected-3-attrs got={}", attrs.len())); }
+            Ok(())
+        }),
+        "b4_pi" => {
+            let mut p = Preserve::default();
+            p.pis = true;
+            opts.set_preserve(p);
+            ("<?target data?><root/>", |events| {
+                let pis: Vec<&PiContent> = events.iter().filter_map(|e| match e { ExiEvent::ProcessingInstruction(pi) => Some(pi), _ => None }).collect();
+                if pis.len() != 1 { return Err(format!("expected-1-PI got={}", pis.len())); }
+                if &*pis[0].name != "target" { return Err("pi-target-mismatch".to_string()); }
+                Ok(())
+            })
+        }
+        "b5_entity" => {
+            let mut p = Preserve::default();
+            p.dtd = true;
+            opts.set_preserve(p);
+            (r#"<!DOCTYPE root [<!ENTITY ext SYSTEM "external.xml">]><root>&ext;</root>"#, |events| {
+                let ers: Vec<&ErContent> = events.iter().filter_map(|e| match e { ExiEvent::EntityReference(er) => Some(er), _ => None }).collect();
+                if ers.len() != 1 { return Err(format!("expected-1-ER got={}", ers.len())); }
+                Ok(())
+            })
+        }
+        "b6_character" => (r#"<root>Hello &amp; World</root>"#, |events| {
+            let chs: Vec<&ChContent> = events.iter().filter_map(|e| match e { ExiEvent::Characters(ch) => Some(ch), _ => None }).collect();
+            if chs.is_empty() { return Err("missing-characters".to_string()); }
+            let combined: String = chs.iter().map(|ch| &*ch.value).collect();
+            if combined != "Hello & World" { return Err("character-mismatch".to_string()); }
+            Ok(())
+        }),
+        "b7_comment" => {
+            let mut p = Preserve::default();
+            p.comments = true;
+            opts.set_preserve(p);
+            ("<!-- comment --><root><!-- inner --></root>", |events| {
+                let cms: Vec<&CmContent> = events.iter().filter_map(|e| match e { ExiEvent::Comment(cm) => Some(cm), _ => None }).collect();
+                if cms.len() != 2 { return Err(format!("expected-2-comments got={}", cms.len())); }
+                Ok(())
+            })
+        }
+        "b8_doctype" => {
+            let mut p = Preserve::default();
+            p.dtd = true;
+            opts.set_preserve(p);
+            (r#"<!DOCTYPE root SYSTEM "root.dtd"><root/>"#, |events| {
+                let dts: Vec<&DtContent> = events.iter().filter_map(|e| match e { ExiEvent::DocType(dt) => Some(dt), _ => None }).collect();
+                if dts.len() != 1 { return Err(format!("expected-1-DT got={}", dts.len())); }
+                Ok(())
+            })
+        }
+        "b9_unparsed" => {
+            let mut p = Preserve::default();
+            p.dtd = true;
+            opts.set_preserve(p);
+            (r#"<!DOCTYPE root [<!NOTATION jpeg SYSTEM "jpeg"><!ENTITY pic SYSTEM "pic.jpg" NDATA jpeg>]><root/>"#, |events| {
+                let dts: Vec<&DtContent> = events.iter().filter_map(|e| match e { ExiEvent::DocType(dt) => Some(dt), _ => None }).collect();
+                if dts.len() != 1 { return Err("missing-doctype".to_string()); }
+                if !dts[0].text.contains("NOTATION") { return Err("missing-notation".to_string()); }
+                Ok(())
+            })
+        }
+        "b10_notation" => {
+            let mut p = Preserve::default();
+            p.dtd = true;
+            opts.set_preserve(p);
+            (r#"<!DOCTYPE root [<!NOTATION jpeg SYSTEM "image/jpeg">]><root/>"#, |events| {
+                let dts: Vec<&DtContent> = events.iter().filter_map(|e| match e { ExiEvent::DocType(dt) => Some(dt), _ => None }).collect();
+                if dts.len() != 1 { return Err("missing-doctype".to_string()); }
+                if !dts[0].text.contains("NOTATION") { return Err("missing-notation".to_string()); }
+                Ok(())
+            })
+        }
+        "b11_namespace" => {
+            let mut p = Preserve::default();
+            p.prefixes = true;
+            opts.set_preserve(p);
+            (r#"<root xmlns:a="http://a" xmlns:b="http://b"><a:x/><b:y/></root>"#, |events| {
+                let nss: Vec<&NsContent> = events.iter().filter_map(|e| match e { ExiEvent::NamespaceDeclaration(ns) => Some(ns), _ => None }).collect();
+                if nss.len() < 2 { return Err("missing-namespace-events".to_string()); }
+                Ok(())
+            })
+        }
+        _ => {
+            emit(&fixture_tag, INFOSET_TEST_ID, "SKIP", "unknown-infoset-fixture");
+            return;
+        }
+    };
+
+    match infoset_round_trip(xml, &opts) {
+        Ok(events) => match checks(&events) {
+            Ok(()) => emit(&fixture_tag, INFOSET_TEST_ID, "OK", "events-match"),
+            Err(e) => emit(&fixture_tag, INFOSET_TEST_ID, "FAIL", &truncate(&e, 80)),
+        },
+        Err(e) => emit(&fixture_tag, INFOSET_TEST_ID, "FAIL", &truncate(&e, 80)),
+    }
+}
+
+// ============================================================================
+// Coverage Matrix
+// ============================================================================
+
+const COVERAGE_TEST_ID: &str = "coverage";
+
+fn run_coverage_tests(basename: &str, alignment: &str) {
+    let fixture_tag = format!("{}_{}", basename, alignment);
+    if alignment != "strict" {
+        emit(&fixture_tag, COVERAGE_TEST_ID, "SKIP", "strict-only");
+        return;
+    }
+
+    let result: Result<(), String> = (|| {
+        match basename {
+            "schema_id_none" => {
+                let xml = "<root><v>1</v></root>";
+                let events = parse_xml_events_from_str(xml, &ExiOptions::default()).map_err(|e| format!("parse xml: {e}"))?;
+                let mut opts = ExiOptions::default();
+                opts.set_schema_id(Some(SchemaId::None));
+                let exi = encode_with_config(&events, &opts, EncoderConfig { include_options: true, ..EncoderConfig::default() })
+                    .map_err(|e| format!("encode: {e}"))?;
+                let dir = cli_temp_dir("schema-id-none");
+                let exi_path = dir.join("out.exi");
+                let decoded_path = dir.join("out.xml");
+                fs::write(&exi_path, exi).map_err(|e| format!("write exi: {e}"))?;
+                exificient_decode(&exi_path, &opts, "", &decoded_path)?;
+                if !decoded_path.exists() {
+                    return Err("exificient decode did not produce output".to_string());
+                }
+                let xml_out = fs::read_to_string(&decoded_path).map_err(|e| format!("read decoded: {e}"))?;
+                assert_infoset_eq(xml, &xml_out).map_err(|e| format!("infoset: {e}"))?;
+                Ok(())
+            }
+            "schema_id_builtin" => {
+                let xml = "<root><v>1</v></root>";
+                let events = parse_xml_events_from_str(xml, &ExiOptions::default()).map_err(|e| format!("parse xml: {e}"))?;
+                let mut opts = ExiOptions::default();
+                opts.set_schema_id(Some(SchemaId::BuiltinOnly));
+                let exi = encode_with_config(&events, &opts, EncoderConfig { include_options: true, ..EncoderConfig::default() })
+                    .map_err(|e| format!("encode: {e}"))?;
+                let dir = cli_temp_dir("schema-id-builtin");
+                let exi_path = dir.join("out.exi");
+                let decoded_path = dir.join("out.xml");
+                fs::write(&exi_path, exi).map_err(|e| format!("write exi: {e}"))?;
+                exificient_decode(&exi_path, &opts, "", &decoded_path)?;
+                if !decoded_path.exists() {
+                    return Err("exificient decode did not produce output".to_string());
+                }
+                let xml_out = fs::read_to_string(&decoded_path).map_err(|e| format!("read decoded: {e}"))?;
+                assert_infoset_eq(xml, &xml_out).map_err(|e| format!("infoset: {e}"))?;
+                Ok(())
+            }
+            "schema_id_id" => {
+                let xml = "<root><v>1</v></root>";
+                let xsd = r#"
+                    <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+                      <xs:element name="root">
+                        <xs:complexType>
+                          <xs:sequence>
+                            <xs:element name="v" type="xs:int"/>
+                          </xs:sequence>
+                        </xs:complexType>
+                      </xs:element>
+                    </xs:schema>
+                "#;
+                let schema = erxi::xsd::parse_xsd(xsd).map_err(|e| format!("parse xsd: {e}"))?;
+                let dir = cli_temp_dir("schema-id-id");
+                let schema_path = dir.join("schema.xsd");
+                fs::write(&schema_path, xsd).map_err(|e| format!("write schema: {e}"))?;
+                let mut opts = ExiOptions::default();
+                opts.set_schema_id(Some(SchemaId::Id(schema_path.to_string_lossy().to_string())));
+                opts.set_strict(true);
+                let events = parse_xml_events_from_str(xml, &opts).map_err(|e| format!("parse xml: {e}"))?;
+                let exi = encode_with_schema_and_config(
+                    &events,
+                    &opts,
+                    &schema,
+                    EncoderConfig { include_options: true, ..EncoderConfig::default() },
+                )
+                .map_err(|e| format!("encode: {e}"))?;
+                let exi_path = dir.join("out.exi");
+                let decoded_path = dir.join("out.xml");
+                fs::write(&exi_path, exi).map_err(|e| format!("write exi: {e}"))?;
+                exificient_decode(&exi_path, &opts, schema_path.to_str().unwrap(), &decoded_path)?;
+                let xml_out = fs::read_to_string(&decoded_path).map_err(|e| format!("read decoded: {e}"))?;
+                assert_infoset_eq(xml, &xml_out).map_err(|e| format!("infoset: {e}"))?;
+                Ok(())
+            }
+            "alignment_matrix" => {
+                let xml = "<root><v>alpha</v><v>beta</v><v>gamma</v><v>delta</v></root>";
+                let variants: Vec<(&str, Box<dyn Fn(&mut ExiOptions)>)> = vec![
+                    ("bitpacked", Box::new(|_| {})),
+                    ("bytealigned", Box::new(|o| o.set_alignment(Alignment::ByteAlignment))),
+                    ("precompression", Box::new(|o| o.set_alignment(Alignment::PreCompression))),
+                    ("compression", Box::new(|o| { o.set_compression(true); o.set_block_size(64); })),
+                ];
+                for (name, apply) in variants {
+                    let mut opts = ExiOptions::default();
+                    apply(&mut opts);
+                    let events = parse_xml_events_from_str(xml, &opts).map_err(|e| format!("{name}: parse: {e}"))?;
+                    let exi = encode(&events, &opts).map_err(|e| format!("{name}: encode: {e}"))?;
+                    let (decoded, _) = decode(&exi).map_err(|e| format!("{name}: decode: {e}"))?;
+                    let xml_out = events_to_xml(&decoded).map_err(|e| format!("{name}: to_xml: {e}"))?;
+                    assert_infoset_eq(xml, &xml_out).map_err(|e| format!("{name}: {e}"))?;
+                }
+                Ok(())
+            }
+            "value_limits" => {
+                let xml = "<root><v>alpha</v><v>bravo</v><v>charlie</v><v>delta</v><v>echo</v></root>";
+                let mut opts = ExiOptions::default();
+                opts.set_value_max_length(Some(4));
+                opts.set_value_partition_capacity(Some(4));
+                let events = parse_xml_events_from_str(xml, &opts).map_err(|e| format!("parse: {e}"))?;
+                let exi = encode(&events, &opts).map_err(|e| format!("encode: {e}"))?;
+                let (decoded, _) = decode(&exi).map_err(|e| format!("decode: {e}"))?;
+                let xml_out = events_to_xml(&decoded).map_err(|e| format!("to_xml: {e}"))?;
+                assert_infoset_eq(xml, &xml_out).map_err(|e| format!("infoset: {e}"))?;
+                Ok(())
+            }
+            "preserve_prefixes" => {
+                let xml = r#"<ns1:root xmlns:ns1="urn:a" xmlns:ns2="urn:b"><ns2:child ns1:attr="v"/></ns1:root>"#;
+                let mut opts = ExiOptions::default();
+                opts.set_preserve(Preserve { prefixes: true, ..Preserve::default() });
+                let events = parse_xml_events_from_str(xml, &opts).map_err(|e| format!("parse: {e}"))?;
+                let exi = encode(&events, &opts).map_err(|e| format!("encode: {e}"))?;
+                let (decoded, _) = decode(&exi).map_err(|e| format!("decode: {e}"))?;
+                let xml_out = events_to_xml(&decoded).map_err(|e| format!("to_xml: {e}"))?;
+                assert_infoset_eq(xml, &xml_out).map_err(|e| format!("infoset: {e}"))?;
+                Ok(())
+            }
+            "dtrm_schema_id" => {
+                let xsd = r#"
+                    <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+                      <xs:element name="root">
+                        <xs:complexType>
+                          <xs:sequence>
+                            <xs:element name="price" type="xs:decimal"/>
+                          </xs:sequence>
+                        </xs:complexType>
+                      </xs:element>
+                    </xs:schema>
+                "#;
+                let schema = erxi::xsd::parse_xsd(xsd).map_err(|e| format!("parse xsd: {e}"))?;
+                let dir = cli_temp_dir("dtrm-schemaid");
+                let schema_path = dir.join("schema.xsd");
+                fs::write(&schema_path, xsd).map_err(|e| format!("write schema: {e}"))?;
+                let xml = "<root><price>12.50</price></root>";
+                let mut opts = ExiOptions::default();
+                opts.set_strict(true);
+                opts.set_schema_id(Some(SchemaId::Id(schema_path.to_string_lossy().to_string())));
+                opts.set_datatype_representation_map(vec![DatatypeRepresentationMapping {
+                    type_qname: QName::new("http://www.w3.org/2001/XMLSchema", "decimal"),
+                    representation_qname: QName::new("http://www.w3.org/2009/exi", "string"),
+                }]);
+                let events = parse_xml_events_from_str(xml, &opts).map_err(|e| format!("parse: {e}"))?;
+                let exi = encode_with_schema_and_config(
+                    &events,
+                    &opts,
+                    &schema,
+                    EncoderConfig { include_options: true, ..EncoderConfig::default() },
+                )
+                .map_err(|e| format!("encode: {e}"))?;
+                let (decoded, decoded_opts) = decode_with_schema(&exi, ExiOptions::default(), &schema)
+                    .map_err(|e| format!("decode: {e}"))?;
+                let xml_out = events_to_xml(&decoded).map_err(|e| format!("to_xml: {e}"))?;
+                assert_infoset_eq(xml, &xml_out).map_err(|e| format!("infoset: {e}"))?;
+                if decoded_opts.schema_id() != opts.schema_id() {
+                    return Err("schema_id_mismatch".to_string());
+                }
+                if decoded_opts.datatype_representation_map().len() != 1 {
+                    return Err("dtrm_len_mismatch".to_string());
+                }
+                Ok(())
+            }
+            _ => {
+                emit(&fixture_tag, COVERAGE_TEST_ID, "SKIP", "unknown-coverage-fixture");
+                return Ok(());
+            }
+        }
+    })();
+
+    match result {
+        Ok(()) => emit(&fixture_tag, COVERAGE_TEST_ID, "OK", "ok"),
+        Err(e) => emit(&fixture_tag, COVERAGE_TEST_ID, "FAIL", &truncate(&e, 80)),
+    }
+}
+
 
 // ============================================================================
 // Skip-Logik (identisch mit cross_rtt.rs)
@@ -515,6 +1364,23 @@ fn run_xml_rtt_test(
 }
 
 fn run_all_tests(suite: &str, basename: &str, alignment: &str) {
+    if suite == "cli" {
+        run_cli_tests(basename, alignment);
+        return;
+    }
+    if suite == "exi4json" {
+        run_exi4json_tests(basename, alignment);
+        return;
+    }
+    if suite == "infoset" {
+        run_infoset_tests(basename, alignment);
+        return;
+    }
+    if suite == "coverage" {
+        run_coverage_tests(basename, alignment);
+        return;
+    }
+
     let fixture_tag = format!("{}_{}", basename, alignment);
     let xml_dir = match suite {
         "declared" => PathBuf::from(declared_xml_dir()),
@@ -1167,7 +2033,7 @@ const ALL_TEST_IDS: &[&str] = &[
 
 fn run_batch() {
     let stdin = std::io::stdin();
-    let valid_suites = ["declared", "undeclared", "dtrm"];
+    let valid_suites = ["declared", "undeclared", "dtrm", "cli", "exi4json", "infoset", "coverage"];
     let valid_alignments = ["bitpacked", "bytealigned", "precompression", "compression", "strict"];
 
     for line in stdin.lock().lines() {
@@ -1208,7 +2074,7 @@ fn main() {
     if args.len() != 4 {
         eprintln!("Usage: {} <suite> <fixture_basename> <alignment>", args[0]);
         eprintln!("       {} --batch  (liest suite fixture alignment von stdin)", args[0]);
-        eprintln!("  suite: declared | undeclared | dtrm");
+        eprintln!("  suite: declared | undeclared | dtrm | cli | exi4json | infoset | coverage");
         eprintln!("  alignment: bitpacked | bytealigned | precompression | compression | strict");
         std::process::exit(1);
     }
@@ -1217,7 +2083,14 @@ fn main() {
     let basename = &args[2];
     let alignment = &args[3];
 
-    if suite != "declared" && suite != "undeclared" && suite != "dtrm" {
+    if suite != "declared"
+        && suite != "undeclared"
+        && suite != "dtrm"
+        && suite != "cli"
+        && suite != "exi4json"
+        && suite != "infoset"
+        && suite != "coverage"
+    {
         eprintln!("Ungültige Suite: {suite}");
         std::process::exit(1);
     }

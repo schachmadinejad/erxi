@@ -5,7 +5,7 @@ and where gaps remain.
 
 References:
 - Full cross runner: `examples/full_cross_test.rs`
-- Cross script: `scripts/run_cross_matrix_test.sh`
+- Cross script: `scripts/run.sh`
 - CLI: `src/bin/erxi.rs`
 
 ## Important Difference
@@ -20,8 +20,8 @@ That means:
 Additionally there is a dedicated CLI E2E suite:
 - `tests/cli_e2e.rs`
 
-And CLI cross-interop tests with Exificient:
-- `tests/cli_cross_exificient.rs`
+CLI cross-interop checks are part of the full cross matrix (CLI fixtures in
+`examples/full_cross_test.rs`).
 
 ## Coverage by CLI Flag
 
@@ -48,7 +48,7 @@ And CLI cross-interop tests with Exificient:
 - `--value-capacity`: Not parameterized in full cross; tested in CLI unit/E2E.
 - `--parallel-deflate`: Not in full cross; tested in CLI E2E.
 - `--include-options`: Not in full cross; tested in CLI E2E.
-- `--no-include-options`: Not in full cross; tested in CLI E2E.
+- `--no-include-options`: Covered via CLI fixture in full cross (out-of-band options).
 - `--include-cookie`: Not in full cross; tested in CLI E2E.
 - `--no-memory-monitor`: Not in full cross; tested in CLI E2E.
 
@@ -80,7 +80,7 @@ E2E tests in `tests/cli_e2e.rs` cover:
 - Roundtrip with `--preserve-lexical`, `--preserve-whitespace`, `--block-size`,
   `--value-max-length`, `--value-capacity`.
 
-Cross tests in `tests/cli_cross_exificient.rs` cover:
+Cross checks in the full cross matrix cover:
 - `erxi` CLI encode (`--byte-aligned --no-include-options`) -> Exificient decode (out-of-band options),
 - Exificient encode (schema + compression + prefixes) -> `erxi` CLI decode.
 
