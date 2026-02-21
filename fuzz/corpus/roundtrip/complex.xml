@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doc xmlns="http://example.org" version="1.0">
+  <header id="h1">
+    <title>Test Document</title>
+  </header>
+  <body>
+    <paragraph>First paragraph.</paragraph>
+    <paragraph>Second paragraph.</paragraph>
+  </body>
+</doc>
