@@ -141,9 +141,12 @@ impl ValueStore {
     }
 
     /// Erstellt neuen bounded Store mit fester Kapazität.
+    ///
+    /// Alloziert NICHT vorab -- Einträge wachsen lazy bei add()/set().
+    /// Verhindert OOM bei manipulierten Kapazitätswerten aus dem EXI-Header.
     fn with_capacity(cap: usize) -> Self {
         Self {
-            entries: vec![None; cap],
+            entries: Vec::new(),
             next_id: 0,
             count: 0,
             capacity: Some(cap),
@@ -178,9 +181,12 @@ impl ValueStore {
     fn add(&mut self, rc: Rc<str>) -> usize {
         let id = self.next_id;
         if self.capacity.is_some() {
-            // Bounded: überschreibe an Position
-            debug_assert!(id < self.entries.len(), "add() on full bounded store");
-            self.entries[id] = Some(rc);
+            // Bounded: lazy wachsen oder ueberschreiben
+            if id < self.entries.len() {
+                self.entries[id] = Some(rc);
+            } else {
+                self.entries.push(Some(rc));
+            }
         } else {
             // Unbounded: append
             self.entries.push(Some(rc));
@@ -192,7 +198,10 @@ impl ValueStore {
 
     /// Set an spezifischer ID (für bounded global nach Wrap).
     fn set(&mut self, id: usize, rc: Rc<str>) {
-        debug_assert!(id < self.entries.len(), "set() called with invalid id");
+        // Lazy wachsen falls noetig (bounded: nicht vorab alloziert)
+        if id >= self.entries.len() {
+            self.entries.resize(id + 1, None);
+        }
 
         if self.entries[id].is_none() {
             self.count += 1;
@@ -493,7 +502,7 @@ impl StringTable {
         value_partition_capacity: Option<usize>,
     ) -> Self {
         let (global_value, global_id_to_entry) = match value_partition_capacity {
-            Some(cap) => (ValueStore::with_capacity(cap), vec![None; cap]),
+            Some(cap) => (ValueStore::with_capacity(cap), Vec::new()),
             None => (ValueStore::new(), Vec::new()),
         };
 
@@ -1053,6 +1062,10 @@ impl StringTable {
 
             let entry = GlobalValueEntry { key, local_id };
             if let Some(cap) = self.value_partition_capacity {
+                // Lazy wachsen: Vec erst bei Bedarf vergroessern
+                if global_id >= self.global_id_to_entry.len() {
+                    self.global_id_to_entry.resize_with(global_id + 1, || None);
+                }
                 self.global_id_to_entry[global_id] = Some(entry);
                 self.global_id = (self.global_id + 1) % cap;
             } else {
@@ -1128,6 +1141,10 @@ impl StringTable {
             local_id,
         };
         if let Some(cap) = self.value_partition_capacity {
+            // Lazy wachsen: Vec erst bei Bedarf vergroessern
+            if global_id >= self.global_id_to_entry.len() {
+                self.global_id_to_entry.resize_with(global_id + 1, || None);
+            }
             self.global_id_to_entry[global_id] = Some(entry);
             self.global_id = (self.global_id + 1) % cap;
         } else {
@@ -1839,12 +1856,12 @@ mod tests {
         assert!(!vs.at_capacity);
     }
 
-    /// Spec 7.3.3: Bounded Store mit Kapazität
+    /// Spec 7.3.3: Bounded Store mit Kapazität (lazy Allokation)
     #[test]
     fn value_store_with_capacity() {
         let vs = ValueStore::with_capacity(5);
         assert_eq!(vs.len(), 0);
-        assert_eq!(vs.entries.len(), 5);
+        assert_eq!(vs.entries.len(), 0); // Lazy: nicht vorab alloziert
         assert_eq!(vs.capacity, Some(5));
         assert!(!vs.at_capacity);
     }
@@ -2795,5 +2812,35 @@ mod tests {
 
         // XSD-Namespace sollte immer vorhanden sein
         assert!(st.lookup_uri(URI_XSD).is_some());
+    }
+
+    /// Regression: Riesige value_partition_capacity darf kein OOM verursachen.
+    /// Gefunden durch Fuzzer (decode-Target, Crash-Input oom-72a698...).
+    #[test]
+    fn huge_value_partition_capacity_no_oom() {
+        // 638_354_598 war der Wert aus dem Fuzzer-Crash
+        let st = StringTable::with_options(None, Some(638_354_598));
+        // Muss ohne OOM erstellt werden (lazy Allokation)
+        assert_eq!(st.global_value_count(), 0);
+    }
+
+    /// Bounded ValueStore mit lazy Allokation funktioniert korrekt.
+    #[test]
+    fn bounded_value_store_lazy_growth() {
+        let mut store = ValueStore::with_capacity(1000);
+        assert!(store.entries.is_empty());
+
+        // add() soll lazy wachsen
+        let rc: Rc<str> = "test".into();
+        let id = store.add(Rc::clone(&rc));
+        assert_eq!(id, 0);
+        assert_eq!(store.entries.len(), 1);
+        assert_eq!(store.get(0), Some("test"));
+
+        // set() soll ebenfalls lazy wachsen
+        let rc2: Rc<str> = "hello".into();
+        store.set(5, rc2);
+        assert_eq!(store.entries.len(), 6);
+        assert_eq!(store.get(5), Some("hello"));
     }
 }
