@@ -1,0 +1,4 @@
+<?xml version="0.0"?>
+<xs:schema xmlns:xs="http:001/XMLSchema">
+  <x:se xmlns:xsme="root" type="xs:string"/>
+</xs:schema>

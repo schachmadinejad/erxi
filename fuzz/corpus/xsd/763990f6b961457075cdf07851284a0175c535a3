@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http:/ww.w3.org/2001/XMLScema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequence>
+  er"     </xs:sequence>
+    t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

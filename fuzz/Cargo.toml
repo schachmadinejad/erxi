@@ -41,3 +41,45 @@ path = "fuzz_targets/roundtrip.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "encode"
+path = "fuzz_targets/encode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "encode_json"
+path = "fuzz_targets/encode_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip_json"
+path = "fuzz_targets/roundtrip_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "options_codec"
+path = "fuzz_targets/options_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "xsd"
+path = "fuzz_targets/xsd.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "compression"
+path = "fuzz_targets/compression.rs"
+test = false
+doc = false
+bench = false

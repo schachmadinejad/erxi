@@ -1,0 +1,11 @@
+<?xml$</ww001/XMLScxs=ttp:"2.0"?><?ɹɹ,
+<xs:schema xmlns:xs="http://www//ww0?xml veon="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequence>
+       <?x<?xmsion="1 verg0"?>s ty   </xs:sequence>
+      <xs:attribute name="id" type="xs:i\t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

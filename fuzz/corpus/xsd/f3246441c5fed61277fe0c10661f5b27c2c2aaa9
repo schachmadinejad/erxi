@@ -1,0 +1,6 @@
+<?xm version="1.0"?>
+<xs:schema xmlns:xs="http://www.whema">
+  <xs:element name="erspon:string"/>
+    $   <xs nname="age" typee="name" tynname="age" type="xs:mnAteger"/>
+      </xs:sequence>
+  '   s:schema>

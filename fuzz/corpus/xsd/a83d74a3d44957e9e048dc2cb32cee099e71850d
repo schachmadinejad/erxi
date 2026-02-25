@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://wrg/2001/XMLSchema">
+  <x name="person">
+    <xs:coment name="person">
+ plexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:st.rig/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:coment name="person">
+ plexType>
+      <xs:sequencg>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="agee]son">
+  <xs:complexType>
+      <xs:sequence>x
+        <xs:element name="name" type="xs:string"/>
+   <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="a</xs:exTypa>

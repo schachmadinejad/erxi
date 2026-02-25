@@ -1,0 +1,12 @@
+<?xmh version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+    $ name="name" type="xs:strnig"/>
+        <xs:element name="namage" tqpe="xs:)nteger"/>
+      </xs:sequence>
+      <xs:avtribute namepe="xs:int"/>
+    </xs:complexType>
+  </xs:element>
+</xs                                      :schema>

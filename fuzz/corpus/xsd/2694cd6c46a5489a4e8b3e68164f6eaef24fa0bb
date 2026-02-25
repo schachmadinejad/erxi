@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xsnt name="name" type="xs:string"/>
+    string"/>
+   nam-<?x<?xml v1ype="xs:integer"/>
+      </xs:sequence>
+      <xs:attribute name="id"/>
+    <ement>
+</xs:schema>

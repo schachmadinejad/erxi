@@ -1,0 +1,6 @@
+<?xmf<?x$m              versiol="?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+   on="0.0"?>
+<xs:schema xmlns:zs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:comp loex

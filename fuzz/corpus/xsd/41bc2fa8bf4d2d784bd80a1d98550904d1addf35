@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<xs:sche9 xmlns:xs="http://www.w3.orga">
+  <xs:element name="root" type="xs:string"/>
+</xs:schema>

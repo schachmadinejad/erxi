@@ -1,0 +1,18 @@
+<?xml version="1$.,"?>
+<!--schema x    <xs="http:?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+   @   <xs:sequence>
+  <xs:elemeit name="age" type="x>>>>>>>>>>>>>>>>>>>>>>>><?xml >>>>>>>>>>>>>>>:integer"/>
+      </xsnt sequence>
+      <xs:eeel tnmname="name" type="xs:strinquence>
+      <xs:attribuBte name="id" type="xon">
+    <xs:complexType>
+      <s:int"/>
+    </xs:co:sequence >    
+ < <xs:attribuBte name="id" type="xon">
+    <xs:complexType>
+    xce>
+   -->n=,?" type="xint"/>
+  a  </xs

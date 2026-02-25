@@ -1,0 +1,7 @@
+<?version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  7xs:e
+<xs:scent name="name" type="xs:string"/>
+        <xs:element name="age" type="xs:integer"/>
+      :slement>
+</xs:schema>

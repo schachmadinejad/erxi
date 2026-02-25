@@ -1,0 +1,4 @@
+<?xm?>
+<xs:schema xmlns:xs="http://www.wXMLSa">
+  <xs:element nam="person">
+    <xs:complex name="name" type="							;	xs:string"/c

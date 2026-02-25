@@ -1,0 +1,7 @@
+<?xmvl ersion="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:includeelement name="root" type="xs:NCName"/>l 
+<xs:schema xmlns:xs="ht/p:t/www0/XMLSchema">
+  <xs:elemnte name="root" type="xs:string"/>
+</xs:schema>
+</xs:schema>

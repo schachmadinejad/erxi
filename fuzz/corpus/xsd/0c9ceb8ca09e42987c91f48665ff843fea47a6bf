@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://w01/XMLSchema">
+  <xs:element name="erspon">
+   $<xs:complexType>
+      <xs:sequence>
+  ement name="name" type="xs:mtring"/>
+        <xs:e																				l versx

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xsquence>
+        <xs:element na-e="name" type="xs:string"/>   -e="name" type="xs:string"/>        <xs:element n="age" type="xs:integr/e">
+      </xs:sequene>
+     <xs:attribute na::schemcomplexType>
+  </xs:element>
+</xs:schema>

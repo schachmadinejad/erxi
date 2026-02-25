@@ -1,0 +1,45 @@
+<?xmversion="1.0"?>
+<xs:schema xmlns:xs="http01/XMLSch	ema">
+  <xs:element name="erspon">
+    <xs:complexType>
+     nce>
+      <xbute name="
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+id" type="xs:in		t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,0 +1,5 @@
+<?xon="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="root" type="zs:NCName"/>lC?x l-rm0 XMLSchema">
+  <xs:element name="root" type="xs:NCName"/>lC? a>
+</xs:schema>

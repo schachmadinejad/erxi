@@ -1,0 +1,18 @@
+<?ersion="0.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequence>
+       |?x<?xmsion="1 ver.0"?>s ty   1n1n="1'.8"?>
+<?xm%<?xl<ve8n="1'.8"xm-<?xl<version"?>
+<?xm01n="1'.8"?>
+<?xm%l"1'.8"?>
+<?xm%l<xs:hrsio8"?>
+<?x?>
+<?xm01n8"?>
+<?xm%<?xl<versioxm%l<xs:hrsio8"?>
+<?xm01n=&1.'8"?></xs:sequence>
+      <xs:attribute name="id" type="xs:i\t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

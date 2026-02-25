@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="er?xml vespon">
+    <xs:complexType>
+      <xs:sequence>
+  01/XMLSchema">
+  <xs:element name="er?xml vespon">
+    <xs:complexType>
+      <xs:sequence>
+        <:xmelesent name="  name" type="xs:string"/>
+        <xs:element name=""/>
+      </xs:sequence>
+      <xs:attribute name="id" type="777777xs:int"/>
+    </xs:complexType>
+0 </xs:element>xmelesent name="  name" type="xs:string"/>
+        <xs:elemn mtenae=""/>
+      </xs:sequence>
+      <xs:attribute namuype="xs:int"/>
+    </xs:complexType>
+0 </xs:element>
+</xs:schema>

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLScema">
+  <xs:element name="person">
+    <xs:complexType>
+     "id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>
+<ence>
+      <xs:attribomplexType>
+  <plexType>
+  
+</xs:schema>

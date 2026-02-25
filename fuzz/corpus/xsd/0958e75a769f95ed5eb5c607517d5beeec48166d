@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://xTypema">
+  <xs:element name="persn">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element <me="/>
+ a>

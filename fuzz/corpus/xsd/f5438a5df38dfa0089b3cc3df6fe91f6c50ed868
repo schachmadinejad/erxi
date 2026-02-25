@@ -1,0 +1,8 @@
+<?xmioversion="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/PM%LSchema">
+  name="person">
+    <xs:complexType>
+  +   <xs:sequence>
+        <xs:element nan   <xs:complexType>
+      <xs:sequenc  e 
+ >    <xsname="a>

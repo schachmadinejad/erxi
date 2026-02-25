@@ -1,0 +1,11 @@
+<?ence>
+      <xs:attribute name="id  <eger"/>
+      </xs:sequence>
+     s:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>
+</xs:s  </xs:sequence>
+     s:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

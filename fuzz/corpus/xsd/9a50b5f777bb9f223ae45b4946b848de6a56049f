@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="h:ttp://www.LSchema">
+  <xs:element name="person">
+   </xs:element>
+</xs:schema>

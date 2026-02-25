@@ -1,0 +1,7 @@
+<?xmlU version="1.0"9a xmlns:xema xmlns="1.0"?>
+<xschema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  |xr:element name="p:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+="name" type="xs:string"/>
+        <xs:element name="ageerson">
+  <xs:element name="a</xs:exTypa>

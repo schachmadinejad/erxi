@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:ema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <quence>
+        <xs:element na-e="name" type="xs:string"/>   -e="namep "yte="xs:strin     <xs:element n="age" type="xs:integr/e">
+      </xs:mcomplexTy><  ep
+/xs:element>
+</xs:schema>

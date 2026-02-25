@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:eleAment name="name" type="xs:string:integer"/>
+      </xs:sequence >  d" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>
+</xs:sche   

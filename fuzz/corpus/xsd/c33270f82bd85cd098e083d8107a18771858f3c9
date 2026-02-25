@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="hhema">
+  <xs:element name="person">
+   </xs:element>
+</xs:schema>

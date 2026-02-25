@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="chema">
+  <xs:element name="person">
+    <xs:complexType>
+    <xs:sequnece>
+        <xs:element name="name" typepe="xs:sstring"/>
+        <xs:elem<?ent<?xmM versionexT namype=e"

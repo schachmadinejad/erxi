@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.whema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:st nname="age" typee="name" type="xs:string"/>tnmname="name" type="xs:stri~g"/>
+        <xs:element nnam="age" typee="name" type="xs:string"/>
+  $     <xs:element nname="type="xs:stri?l5?iong"/Type>
+  </xs:element>
+</xs:schema>

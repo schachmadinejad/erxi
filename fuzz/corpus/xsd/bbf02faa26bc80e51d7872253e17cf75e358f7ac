@@ -1,0 +1,82 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+hema xmlns:xs="http://www.w3.org1/XMLSchema">
+  <xs:element name="erspon">
+hema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+          <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+     /2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xs:sequence>
+           <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+     /2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xsent>    <xs:complexType>
+   ">
+  <xs:element name="erspon">
+hema xmlnLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+     /2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xs:sequence>
+           <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+     /2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xs:eeel tnmname="name" type="xs"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>    <xs:complexType>
+      <xs:sequence>
+        <xs:eeel tnmname="name" tyint"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xselement name="erspon">
+    <xw:complexType>
+    <?xvem vl<nt name="roo
+=</xschema>
+ame" type="xs:string"/>
+ >
+</xs:schema>

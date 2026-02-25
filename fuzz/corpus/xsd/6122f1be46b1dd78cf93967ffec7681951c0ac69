@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.whema">
+  <xs:ele     >xs:elemant sequenype="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsionl tnmname="name" type="xs:string"/>
+  ="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elemant  type="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elemant sequence>
+           <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+ uenype="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+   ="xs:string"/>
+  ="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elema tnsequencl tnmname="name" type="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elemant sequence>
+           <xs:element nname="age" type="xs:in<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="er?xml vte 01/XMLSchema">
+  <xs:el"xs:semt

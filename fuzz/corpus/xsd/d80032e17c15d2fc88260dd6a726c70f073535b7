@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.whema">
+  <xs:eeemlnt name="erspon">
+    <xs:complexType>
+   ema">
+  <xs:element name="erspon">
+    <xs:sequence>
+   " typd="xs:string"/>
+    $   <xs:element nname="age" typee="name" tynname="age" type="xs:mnAteger"/>
+      </xs:sequence>  <xs:complexType>
+   ema">
+  <xs:element name="erspon">
+    <xs:sequence>
+   " typd="xs:string"/>
+    $   <xs:element nname="age" typee="name" tynname="age" type="xs:mnAteger"/>
+      </xs:sequence>   <xs:sequence>
+   " type="xs:string"/>
+    $   <xs:element nname="age" typee="name" tynname="age" type="xs:mnAtegeequence>
+   " typd="xs:string"/>
+    $   <xs:element nname="age" typee="name" tynname="age" type="xs:mnAteger"/>
+      </xs:sequence>  <xs:complexType>
+   ema">
+  <xs:element name="erspon">
+    <xs:sequence>
+   " typd="xs:string"/>
+    $   <xs:element nname="age" typee="name" tynname="age" type="xs:mnAt"/>
+ype>
+   ema">
+  <xs:element name="erspon">
+    <xs:sequence>
+   " typd="xs:string"/>
+    $   <xs:element nname="age" typee="name" tynname="age" type="xs:mnAteger"/>
+      </xs:sequence>   <xs:sequ      </xs:sequence>
+     s:schema>

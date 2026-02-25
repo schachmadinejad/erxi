@@ -1,0 +1,3 @@
+<:schema xmlns:xs="http://www.w3.orgSchema">
+  <xs:element name="person">
+    <xs:coype="xs:int"/  </xs

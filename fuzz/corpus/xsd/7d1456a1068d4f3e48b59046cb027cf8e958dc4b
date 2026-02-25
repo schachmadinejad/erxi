@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.whema">
+    <xs:element name="name" type="xs:strinversiong"/>
+        >xs:elem      <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elemant sequence>
+ 3     <xs:eemelce>
+      <xs:eeel tnmname="name" type="xs:string"/>
+     el tnmname="name" type="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elemant sequence>
+      <xs:eemeln tname="name" type="xs:string"/>
+           <xs:element nname="age" type="xs:integer"/>
+   rsio>
+      <xs:eemeln tname="name" type="xs:string"/>
+        <xs:element nname="age" type="xs:integerage" type="xs:integer"/>
+:schema>

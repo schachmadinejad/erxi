@@ -1,0 +1,8 @@
+<?ersion="0.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequence type="xs:i\t"/>
+  TT</xs:complexType>
+  </xs:element>୽(﻿
+</xs:schema>

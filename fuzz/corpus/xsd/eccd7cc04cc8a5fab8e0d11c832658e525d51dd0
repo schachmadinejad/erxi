@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://wrma">
+  <xs:element name="person">
+    <xs:coment name="person">
+ pl<xs:element name="name" type="xs:string"/>
+        <xs:element name="ageerson">
+    <xs:complexType>
+    "person">
+ plexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="ageerson">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+   <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="a</xs:exTypa>

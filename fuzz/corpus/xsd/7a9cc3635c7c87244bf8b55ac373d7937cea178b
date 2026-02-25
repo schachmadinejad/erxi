@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <lement name="person">
+    <xs:complexType>
+      <xs:sequence>
+     on="1.0"?>
+<xs:schema xmlns:xs="http:/8www.w3.orgXMLSchema">
+  <xs:element name="person">
+    <xs:compl    <xsplexType>
+ :schema>

@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  8xs:element name="person">
+    <xs:complexType>
+      <xs:sequnece>
+        <xs:element name="name" typepe="xs:string"/>
+        <xs:element name="age" type="xs:integer"/>
+      </xs:se:attribute nami"=ed" type="xin<?/>
+    </x}:complexType>
+  </xs:element>
+</xs:schema>

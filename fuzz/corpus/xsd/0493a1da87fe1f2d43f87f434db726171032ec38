@@ -1,0 +1,143 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="LSch	ema">
+  <e>
+      <xs:sequence>
+        <xs:element name="na" txpe="xs:integer"/>      </xs:sequence>
+      <xs:attribute name="
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+id" type="xs:in		t"/>
+ pr="i*ng"/>Type>
+      <xs:sequence>
+    $   <xs:element name="name" typr="xs:stri*ng"/>
+   "age" type="xs:integer"/>      </xs:sequence>
+      <xs:attribute name="
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+="xs:stri*ng"/>
+   "agexs:elOement>
+</xss:element>
+<xs:/schema>

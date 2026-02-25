@@ -1,0 +1,4 @@
+<?xml version="1.1"?>
+<xs:schema xmlns:xs="httphema">
+  <xs:e xmlns:xsme="root" type="xs:string"/>
+</xs:schema>

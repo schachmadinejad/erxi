@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="er?xml vesp'n">
+    <xs:complexType>
+      <xs:sequence>
+  01/XMLSchema">
+  <xs:element name="el mrx?vespon">
+    <xs:complexType>
+      <xs:sequence>
+        <:xmelesent name="  name" type="xs:string"/>
+        <xs:element name="]/////////////////////////////////////////////////////////////////////////////////"/>
+      </xs:sequence>
+      <xs:attribute name="hid" type="xs:int"/>
+    </xs:complexType>
+0 </xs:element>      <:xmelesent name="  name" type="xs:string"/>
+   @     <xs:element name=""/>
+      </xs:sequence>
+      <xs:attribute name="id" type="x!:int"/>
+    </xs:complexType>
+5 </xs:element>
+</xs:schema>

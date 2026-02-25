@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="htt3.org/2001/XMLSchema">
+meplexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:s" type="xs:tring"/>
+ypa>

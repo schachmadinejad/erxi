@@ -1,0 +1,6 @@
+<?xmlU version="1ma xmlns="1.0"?>
+<xsihema xmlns:xs="httpw3.org/2001/XM">
+  |xr:element name="p:xs="http/2001/XMLSchema">
+  <xs:element name="person">
+="name" type="xs:string"/>
+    na/xs:sgeerson<!DOCTYP">

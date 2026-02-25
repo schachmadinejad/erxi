@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequnece>
+       !<xs:element name="xs:integer"/> name="age" typer"/>
+      </xs:sequence>
+      <xs:attrrbute</xs:complexType>
+  </xs:element>
+</xs:schema>

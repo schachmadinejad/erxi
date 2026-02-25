@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://wwtp://www.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="name" type="xw.w3.org/2001/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="agent name=" type="xs:integer"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+0 </xs:element>
+</xs:sche]]>ma>

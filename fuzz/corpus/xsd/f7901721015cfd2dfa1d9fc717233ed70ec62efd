@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="ttp://www.w4.org/2001/XMLQchema">
+  <xs:element name="person" 
+>   <xs:complexType>
+      <xs:sequn_ce>
+        <xs:element name="name" type="xs:string"/>
+   :element name="ag<xs:complexType>
+      <xs:sequn_ce>
+        <xs:element name="name" type=lement>
+</xs:schema>

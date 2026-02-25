@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://.org/2001/Xhema">
+  <xs:element name="er'pon">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="age" type="xs:integer"/>//.org/2001/Xhema">
+  <xs:element name="er'pon">
+    <xs:complexType>
+  t n<x>
+s:ame=in

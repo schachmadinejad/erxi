@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:elemenv name="person">
+    <xs:complexType>
+      <xs:sequence>
+          </xs:sequence>
+  xs:attribute name="﻿id"e="xs:int"/>
+    </xs:complexType>
+  </xs:element:schema>

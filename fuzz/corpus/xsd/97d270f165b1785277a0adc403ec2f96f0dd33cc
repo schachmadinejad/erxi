@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.whema">
+  <xs:element name="erspon">
+    <xs:complexType>
+     ame="name" type="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+   rsiong"/>
+        >xs:elemant sequence <xs:eemeln tname="name" type="xs:string"/>
+        <xs:element nname="age" type="xs:int
+      </xs:s>

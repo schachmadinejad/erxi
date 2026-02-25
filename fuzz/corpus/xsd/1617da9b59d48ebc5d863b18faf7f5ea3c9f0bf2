@@ -1,0 +1,12 @@
+<?xersion="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="er?xml vespon">
+    <xs:complexType>
+      <xs:sequence>
+        <:xmelesent name="  natring"/>
+        <xs:element name=""/>
+      </xs:sequence>
+      <xs:attribute namje="id" type="xs:int"/>
+    </xs:complexType>
+5 </xs:element>
+</xs:schema>

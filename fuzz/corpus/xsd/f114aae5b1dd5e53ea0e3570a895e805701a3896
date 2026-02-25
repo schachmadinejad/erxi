@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.2001/PMLSchema">
+  name="person">
+    <xs:complexType>
+      """"""""""""""n<xs:sequence>
+        <xs:element name="name" type="xs:syring"/>
+ment name="agee lexTyxmlns:xs="h

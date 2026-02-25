@@ -1,0 +1,11 @@
+<?ersion="0.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequence>
+       x?>
+<?xm0=&1.'8"?></xs:sequence>
+      <xs:attribute name="kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkid" type="xs:i\t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

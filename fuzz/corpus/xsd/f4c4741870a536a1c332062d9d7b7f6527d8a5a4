@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www//ww001/XMLSchema">
+ ?>
+<xs:schema xmlns:hs="http://wema">>
+<xs:schema xmlns:sx="http://www//ww001/XMLSchema">xsxmlns:`scheers
+.w2*.org/2001/XMLSchema">>
+<xs:schema xmlns:sp="htXMLSchema">xsxmlns:`sche@rs
+ ?>
+<xs:schema xmlns:hs="http://www.w2*.org/2001/XMLSchema">>
+<xs:schema xmlns:sx="http://www//ww001/XMLSchema">xsxmlns:`scheersion="1.0"?>
+<xs:schema xmlns:hA="http://www.w2*.org'2001/XMLSchema">>
+ person">
+ pl<xs:element name="name" type="xs:string"/>
+        <xs:element name="ageerson">
+    <xs:complexType>
+    "person">
+ plexType>
+      <xs:sequence>
+				<!DOCTYPE			P      E				
+				SYST

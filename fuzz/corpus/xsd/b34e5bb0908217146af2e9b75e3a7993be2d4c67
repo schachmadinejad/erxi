@@ -1,0 +1,19 @@
+<?:sl version="1.0"?>
+<xs:schema xmlns:xs="http://wwwg/2001/XMLSchema">
+  <xs:complexType>
+      <xs:sequence>
+        <xs:element name="naeger"/>
+      </xs:sequence >    
+ <xs:attribute name="id" type="xs:int"/> xm>
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs:sequence>
+        <t name="naeger"/>
+      </xs:sequence >    
+ <xs:attribute name="id" type="xs:int"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

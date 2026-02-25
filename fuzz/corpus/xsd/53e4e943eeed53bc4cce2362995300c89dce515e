@@ -1,0 +1,9 @@
+<?ersi0.0"?>
+<xs:schema xmlns:xs="http://whema">
+  <xs:element name="person">
+    <xs:complexType>
+      <xs:sequence>
+       <?x<?xmsion="1 ver.0"?>s ty   </xs:sequence>s:i\t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

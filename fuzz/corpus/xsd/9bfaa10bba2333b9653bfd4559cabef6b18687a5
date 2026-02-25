@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w4.org/2001/XMLSchema">
+  <xjjjment name="root" type="xs:string"/>
+</xs:schema>

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w301/XMLSchema">
+  <xs:element nime="person">
+    <xs:complexType>
+s:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="age" type="xid" type="xs:int"/>
+    </xs:   <xs:elemechema>

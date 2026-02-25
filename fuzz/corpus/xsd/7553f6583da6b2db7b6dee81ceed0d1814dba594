@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:elfment name="person" 
+>ype>
+      :elemepe="xs:int"/>
+    </xs:complexT  </xs:complexTye>
+  </xs:element>
+</x[:schema>

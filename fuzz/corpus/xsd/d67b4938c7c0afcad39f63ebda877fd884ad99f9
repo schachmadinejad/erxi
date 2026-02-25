@@ -1,0 +1,10 @@
+<?ersion="0.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="person">
+    <xs:complexType>
+    <xs:sequence>
+       <?x<?xmsion="1 ver.a<P?>s ty   </xs:sequence>
+      <xs:attributaeen m="id" type="xs:i\t"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

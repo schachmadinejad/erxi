@@ -1,0 +1,19 @@
+<Q>Q>version="2.0"?>
+<xs:schema xmlns:xs="http://wson">
+    <xs:coment name="person">
+ plex     <xs:element name="ageerson">
+    <xs:complexType>
+Type>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="ageerson">
+    <xs:comType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="ageerson">
+    <xs:gomplexType>
+      <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+   <xs:sequence>
+        <xs:element name="name" type="xs:string"/>
+        <xs:element name="a</xs:exTypa>

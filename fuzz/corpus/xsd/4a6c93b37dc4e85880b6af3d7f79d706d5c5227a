@@ -1,0 +1,8 @@
+<?xmev lrsion="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchcma">
+  <xs:element name="erspon">
+    <xs:complexType>re"e/g>
+      </xs:sequence >"   
+ <xs:attribute name="id" type="xs:e>
+  </xs:element>
+</xs:schema>

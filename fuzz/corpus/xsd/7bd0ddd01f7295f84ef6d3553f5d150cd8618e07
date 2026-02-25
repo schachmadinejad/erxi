@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w31/XMLSchema">
+  <xs:element name="erspon">
+    <xs:complexType>
+      <xs---------------------------------------------------------------------------------------------------------------------------------------e="name" type="xs:string"/@
+        <xs:element name=">

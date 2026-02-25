@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="htp://a">
+  <xs:element name="erspon">
+ s:complexType>
+      <xs:sequence>
+       <xs:element name="name" type="xs:strinversiong"/>
+        >xs:elemant>
+      <xs:eeel tnmname="name" type="xs:string"/>
+        <xs:element nname="age" type="xs:integer"/>
+  (   </xs:sequence>
+      <ribuBte name="id" type="xs:int"/>
+  <?x{ml;$"?>
+  <<?x{

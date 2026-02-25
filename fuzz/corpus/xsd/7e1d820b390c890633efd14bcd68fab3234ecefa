@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="root" type="xs:string"/>l version="1.0"?>
+<xs:schema xmlns:xs="ht/p:t/www.w3.org/2001/XMLSchema">
+  <xs:element name="root" type="xs:string"/>
+</xs:schema>
+</xs:schema>

@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="httP://www.200a">
+  name="person">
+    <xs:complexType>
+      """"""""""""""~<xs:sequence>
+        <xs:element name="name" type="xs:syring"/>
+ment name="agee lexTyxmlns:xs="h

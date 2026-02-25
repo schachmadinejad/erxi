@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchem+">
+  <xs:element name="person">
+    <xs:complex>
+<xs:schema xmlns:ps="http://www.w3.org/2001/XMLSchema">
+  <xs:elecomplexType>
+      <xs:sequence>
+     on="1.0"?>
+<xs:schema xmlns:xs="http://wxs:schema xmlns:xs=MLttp://www.w3.org/2001/Xe="pe/xs:compma>

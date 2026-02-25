@@ -1,0 +1,7 @@
+<?xmlesrv io="1.0"?>
+<xs:schema xmlns:xs="http://www//ww001/XMLSchema">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element ame="person">
+ !  <xs9complexType>
+      e=xs="http://www//ww001/XMLSchema">
+<xs:schema xmlns:xs="http://www//www.w3.org/2001/XMLScheoma
